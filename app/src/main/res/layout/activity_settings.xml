@@ -108,6 +108,28 @@
             android:inputType="textPassword"
             android:layout_marginBottom="24dp"/>
 
+        <!-- Bluetooth Configuration -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/lbl_bluetooth"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnConnectBluetooth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_connect_bluetooth"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvConnectedDevice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/lbl_connected_device"
+            android:layout_marginBottom="24dp"/>
+
         <!-- Data Storage -->
         <TextView
             android:layout_width="wrap_content"

@@ -13,5 +13,8 @@
     <string name="hint_password">Wi-Fi Password</string>
     <string name="lbl_storage">Data Storage Options</string>
     <string name="opt_save_local">Save Footage Locally</string>
+    <string name="lbl_bluetooth">Bluetooth Connection</string>
+    <string name="btn_connect_bluetooth">Connect Device</string>
+    <string name="lbl_connected_device">Connected: None</string>
     <string name="btn_save_settings">Save Settings</string>
 </resources>
