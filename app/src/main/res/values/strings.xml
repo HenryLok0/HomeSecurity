@@ -17,4 +17,5 @@
     <string name="btn_connect_bluetooth">Connect Device</string>
     <string name="lbl_connected_device">Connected: None</string>
     <string name="btn_save_settings">Save Settings</string>
+    <string name="msg_no_activity">No recent movement detected</string>
 </resources>

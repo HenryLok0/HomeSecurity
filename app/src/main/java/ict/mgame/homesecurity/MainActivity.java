@@ -18,6 +18,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnSettings;
     private Button btnToggleAlarm;
     private TextView tvStatus;
+    private TextView tvNotification;
     private boolean isArmed = true;
 
     @Override
@@ -34,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
         btnSettings = findViewById(R.id.btnSettings);
         btnToggleAlarm = findViewById(R.id.btnToggleAlarm);
         tvStatus = findViewById(R.id.tvStatus);
+        tvNotification = findViewById(R.id.tvNotification);
 
         btnSettings.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -52,6 +54,14 @@ public class MainActivity extends AppCompatActivity {
         });
 
         updateStatus();
+        
+        // Example usage: Simulate a detection after 5 seconds (for demonstration)
+        new android.os.Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                updateDetectionStatus("John Doe", true);
+            }
+        }, 5000);
     }
 
     private void updateStatus() {
@@ -61,6 +71,35 @@ public class MainActivity extends AppCompatActivity {
         } else {
             tvStatus.setText("System Status: DISARMED");
             btnToggleAlarm.setText("Arm System");
+        }
+    }
+
+    /**
+     * Updates the notification bar with detection information.
+     * @param personName The name of the person detected.
+     * @param isFamily Whether the person is a family member.
+     */
+    public void updateDetectionStatus(String personName, boolean isFamily) {
+        String message;
+        int color;
+        int backgroundColor;
+
+        if (isFamily) {
+            message = "Family member detected: " + personName;
+            color = 0xFF2E7D32; // Green 800
+            backgroundColor = 0xFFE8F5E9; // Green 50
+        } else {
+            message = "Unknown person detected: " + personName;
+            color = 0xFFC62828; // Red 800
+            backgroundColor = 0xFFFFEBEE; // Red 50
+        }
+
+        tvNotification.setText(message);
+        tvNotification.setTextColor(color);
+        
+        // Find the CardView parent to change background color
+        if (tvNotification.getParent() instanceof androidx.cardview.widget.CardView) {
+            ((androidx.cardview.widget.CardView) tvNotification.getParent()).setCardBackgroundColor(backgroundColor);
         }
     }
 }

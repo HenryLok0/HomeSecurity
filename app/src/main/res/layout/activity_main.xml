@@ -26,6 +26,29 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cvNotification"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        app:cardBackgroundColor="#E3F2FD"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnSettings">
+
+        <TextView
+            android:id="@+id/tvNotification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:text="@string/msg_no_activity"
+            android:textColor="#1565C0"
+            android:textSize="14sp"
+            android:gravity="center" />
+    </com.google.android.material.card.MaterialCardView>
+
     <FrameLayout
         android:id="@+id/cameraContainer"
         android:layout_width="0dp"
@@ -34,7 +57,7 @@
         android:layout_marginTop="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btnSettings">
+        app:layout_constraintTop_toBottomOf="@+id/cvNotification">
 
         <TextView
             android:layout_width="wrap_content"
