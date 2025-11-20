@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">HomeSecurity</string>
+    <string name="title_settings">Settings</string>
+    <string name="lbl_sensitivity">Alarm Sensitivity</string>
+    <string name="lbl_camera_mode">Camera Operating Mode</string>
+    <string name="mode_continuous">Continuous Monitoring</string>
+    <string name="mode_scheduled">Scheduled Activity</string>
+    <string name="mode_sleep">Sleep Mode</string>
+    <string name="lbl_notifications">Notification Preferences</string>
+    <string name="opt_notifications_enable">Enable Notifications</string>
+    <string name="lbl_wifi">Wi-Fi Connectivity</string>
+    <string name="hint_ssid">Wi-Fi SSID</string>
+    <string name="hint_password">Wi-Fi Password</string>
+    <string name="lbl_storage">Data Storage Options</string>
+    <string name="opt_save_local">Save Footage Locally</string>
+    <string name="btn_save_settings">Save Settings</string>
+</resources>
