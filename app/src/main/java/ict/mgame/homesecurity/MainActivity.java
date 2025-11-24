@@ -1,25 +1,73 @@
 package ict.mgame.homesecurity;
 
+import android.Manifest;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
+import androidx.camera.core.Preview;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.video.MediaStoreOutputOptions;
+import androidx.camera.video.Quality;
+import androidx.camera.video.QualitySelector;
+import androidx.camera.video.Recorder;
+import androidx.camera.video.Recording;
+import androidx.camera.video.VideoCapture;
+import androidx.camera.video.VideoRecordEvent;
+import androidx.camera.view.PreviewView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.common.util.concurrent.ListenableFuture;
+
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class MainActivity extends AppCompatActivity {
 
+    private static final String TAG = "HomeSecurityApp";
+    private static final String FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS";
+    private static final int REQUEST_CODE_PERMISSIONS = 10;
+    private static final String[] REQUIRED_PERMISSIONS =
+            Build.VERSION.SDK_INT <= Build.VERSION_CODES.P ?
+                    new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE} :
+                    new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
+
     private Button btnSettings;
-    private Button btnToggleAlarm;
+    private Button btnTakePhoto;
+    private Button btnRecordVideo;
+    private Button btnHistory;
+    private Button btnNotifications;
+    private Button btnLogout;
     private TextView tvStatus;
     private TextView tvNotification;
-    private boolean isArmed = true;
+    private PreviewView viewFinder;
+
+    private ImageCapture imageCapture;
+    private VideoCapture<Recorder> videoCapture;
+    private Recording recording;
+    private ExecutorService cameraExecutor;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,74 +80,220 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
+        // Initialize Views
         btnSettings = findViewById(R.id.btnSettings);
-        btnToggleAlarm = findViewById(R.id.btnToggleAlarm);
+        btnTakePhoto = findViewById(R.id.btnTakePhoto);
+        btnRecordVideo = findViewById(R.id.btnRecordVideo);
+        btnHistory = findViewById(R.id.btnHistory);
+        btnNotifications = findViewById(R.id.btnNotifications);
+        btnLogout = findViewById(R.id.btnLogout);
         tvStatus = findViewById(R.id.tvStatus);
         tvNotification = findViewById(R.id.tvNotification);
+        viewFinder = findViewById(R.id.viewFinder);
 
-        btnSettings.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
-                startActivity(intent);
-            }
+        tvStatus.setText("System Status: Online");
+
+        // Request camera permissions
+        if (allPermissionsGranted()) {
+            startCamera();
+        } else {
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
+        }
+
+        // Set Listeners
+        btnSettings.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+            startActivity(intent);
         });
 
-        btnToggleAlarm.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                isArmed = !isArmed;
-                updateStatus();
-            }
+        btnTakePhoto.setOnClickListener(v -> takePhoto());
+
+        btnRecordVideo.setOnClickListener(v -> captureVideo());
+
+        btnHistory.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, HistoryActivity.class);
+            startActivity(intent);
         });
 
-        updateStatus();
-        
-        // Example usage: Simulate a detection after 5 seconds (for demonstration)
-        new android.os.Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                updateDetectionStatus("John Doe", true);
-            }
-        }, 5000);
+        btnNotifications.setOnClickListener(v -> showNotificationHistory());
+
+        btnLogout.setOnClickListener(v -> {
+            Toast.makeText(MainActivity.this, "Logout clicked", Toast.LENGTH_SHORT).show();
+            finish();
+        });
+
+        cameraExecutor = Executors.newSingleThreadExecutor();
     }
 
-    private void updateStatus() {
-        if (isArmed) {
-            tvStatus.setText("System Status: ARMED");
-            btnToggleAlarm.setText("Disarm System");
-        } else {
-            tvStatus.setText("System Status: DISARMED");
-            btnToggleAlarm.setText("Arm System");
+    private void takePhoto() {
+        if (imageCapture == null) return;
+
+        String name = new SimpleDateFormat(FILENAME_FORMAT, Locale.US)
+                .format(System.currentTimeMillis());
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/HomeSecurity-Image");
+        }
+
+        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(
+                getContentResolver(),
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues
+        ).build();
+
+        imageCapture.takePicture(
+                outputOptions,
+                ContextCompat.getMainExecutor(this),
+                new ImageCapture.OnImageSavedCallback() {
+                    @Override
+                    public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                        String msg = "Photo capture succeeded: " + outputFileResults.getSavedUri();
+                        Toast.makeText(getBaseContext(), msg, Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, msg);
+                    }
+
+                    @Override
+                    public void onError(@NonNull ImageCaptureException exception) {
+                        Log.e(TAG, "Photo capture failed: " + exception.getMessage(), exception);
+                    }
+                }
+        );
+    }
+
+    private void captureVideo() {
+        if (videoCapture == null) return;
+
+        btnRecordVideo.setEnabled(false);
+
+        Recording curRecording = recording;
+        if (curRecording != null) {
+            // Stop recording
+            curRecording.stop();
+            recording = null;
+            return;
+        }
+
+        // Start recording
+        String name = new SimpleDateFormat(FILENAME_FORMAT, Locale.US)
+                .format(System.currentTimeMillis());
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            contentValues.put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/HomeSecurity-Video");
+        }
+
+        MediaStoreOutputOptions mediaStoreOutputOptions = new MediaStoreOutputOptions.Builder(
+                getContentResolver(),
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        )
+        .setContentValues(contentValues)
+        .build();
+
+        recording = videoCapture.getOutput()
+                .prepareRecording(this, mediaStoreOutputOptions)
+                .withAudioEnabled()
+                .start(ContextCompat.getMainExecutor(this), recordEvent -> {
+                    if (recordEvent instanceof VideoRecordEvent.Start) {
+                        btnRecordVideo.setText("Stop");
+                        btnRecordVideo.setBackgroundColor(0xFFFF0000); // Red
+                        btnRecordVideo.setEnabled(true);
+                    } else if (recordEvent instanceof VideoRecordEvent.Finalize) {
+                        if (!((VideoRecordEvent.Finalize) recordEvent).hasError()) {
+                            String msg = "Video capture succeeded: " + ((VideoRecordEvent.Finalize) recordEvent).getOutputResults().getOutputUri();
+                            Toast.makeText(getBaseContext(), msg, Toast.LENGTH_SHORT).show();
+                            Log.d(TAG, msg);
+                        } else {
+                            recording.close();
+                            recording = null;
+                            Log.e(TAG, "Video capture ends with error: " + ((VideoRecordEvent.Finalize) recordEvent).getError());
+                        }
+                        btnRecordVideo.setText("Record");
+                        btnRecordVideo.setBackgroundColor(0xFF4CAF50); // Green (Default) - Adjust to your theme color
+                        btnRecordVideo.setEnabled(true);
+                    }
+                });
+    }
+
+    private void startCamera() {
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
+
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+
+                Preview preview = new Preview.Builder().build();
+                preview.setSurfaceProvider(viewFinder.getSurfaceProvider());
+
+                imageCapture = new ImageCapture.Builder().build();
+
+                Recorder recorder = new Recorder.Builder()
+                        .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                        .build();
+                videoCapture = VideoCapture.withOutput(recorder);
+
+                CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+
+                try {
+                    cameraProvider.unbindAll();
+                    cameraProvider.bindToLifecycle(
+                            this, cameraSelector, preview, imageCapture, videoCapture);
+                } catch (Exception exc) {
+                    Log.e(TAG, "Use case binding failed", exc);
+                }
+
+            } catch (ExecutionException | InterruptedException e) {
+                Log.e(TAG, "CameraProvider failed", e);
+            }
+        }, ContextCompat.getMainExecutor(this));
+    }
+
+    private boolean allPermissionsGranted() {
+        for (String permission : REQUIRED_PERMISSIONS) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (allPermissionsGranted()) {
+                startCamera();
+            } else {
+                Toast.makeText(this, "Permissions not granted by the user.", Toast.LENGTH_SHORT).show();
+                finish();
+            }
         }
     }
 
-    /**
-     * Updates the notification bar with detection information.
-     * @param personName The name of the person detected.
-     * @param isFamily Whether the person is a family member.
-     */
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        cameraExecutor.shutdown();
+    }
+
+    private void showNotificationHistory() {
+        String[] events = {
+                "Motion detected - 10:45 AM",
+                "Motion detected - 11:30 AM",
+                "Motion detected - 02:15 PM",
+                "Motion detected - 04:20 PM"
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Motion Events");
+        builder.setItems(events, null);
+        builder.setPositiveButton("Close", null);
+        builder.show();
+    }
+    
     public void updateDetectionStatus(String personName, boolean isFamily) {
-        String message;
-        int color;
-        int backgroundColor;
-
-        if (isFamily) {
-            message = "Family member detected: " + personName;
-            color = 0xFF2E7D32; // Green 800
-            backgroundColor = 0xFFE8F5E9; // Green 50
-        } else {
-            message = "Unknown person detected: " + personName;
-            color = 0xFFC62828; // Red 800
-            backgroundColor = 0xFFFFEBEE; // Red 50
-        }
-
-        tvNotification.setText(message);
-        tvNotification.setTextColor(color);
-        
-        // Find the CardView parent to change background color
-        if (tvNotification.getParent() instanceof androidx.cardview.widget.CardView) {
-            ((androidx.cardview.widget.CardView) tvNotification.getParent()).setCardBackgroundColor(backgroundColor);
-        }
+        // Implementation kept for compatibility
     }
 }

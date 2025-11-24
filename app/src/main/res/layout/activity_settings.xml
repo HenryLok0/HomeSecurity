@@ -20,136 +20,90 @@
             android:textStyle="bold"
             android:layout_marginBottom="24dp"/>
 
-        <!-- Alarm Sensitivity -->
+        <!-- Bluetooth Devices Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/lbl_sensitivity"
+            android:text="Connected Bluetooth Devices"
             android:textStyle="bold"
+            android:textSize="18sp"
             android:layout_marginBottom="8dp"/>
 
-        <SeekBar
-            android:id="@+id/seekSensitivity"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="50"
-            android:layout_marginBottom="24dp"/>
+            android:layout_height="200dp"
+            android:layout_marginBottom="24dp"
+            android:background="#F5F5F5">
 
-        <!-- Camera Mode -->
+            <ListView
+                android:id="@+id/lvBluetoothDevices"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+
+            <LinearLayout
+                android:id="@+id/layoutNoDevice"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    app:tint="#757575"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="(No device connect)"
+                    android:textColor="#757575"
+                    android:textSize="16sp"
+                    android:layout_marginTop="8dp"/>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Reset Password Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/lbl_camera_mode"
+            android:text="Reset Password"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:textSize="18sp"
+            android:layout_marginBottom="16dp"/>
 
-        <RadioGroup
-            android:id="@+id/rgCameraMode"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp">
+            android:layout_marginBottom="8dp"
+            android:hint="New Password">
 
-            <RadioButton
-                android:id="@+id/rbContinuous"
-                android:layout_width="wrap_content"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etNewPassword"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/mode_continuous" />
+                android:inputType="textPassword"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
-            <RadioButton
-                android:id="@+id/rbScheduled"
-                android:layout_width="wrap_content"
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="Confirm New Password">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etConfirmPassword"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/mode_scheduled" />
-
-            <RadioButton
-                android:id="@+id/rbSleep"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/mode_sleep" />
-        </RadioGroup>
-
-        <!-- Notifications -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/lbl_notifications"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
-
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/switchNotifications"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/opt_notifications_enable"
-            android:layout_marginBottom="24dp"/>
-
-        <!-- Wi-Fi Configuration -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/lbl_wifi"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
-
-        <EditText
-            android:id="@+id/etWifiSSID"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_ssid"
-            android:inputType="text"
-            android:layout_marginBottom="8dp"/>
-
-        <EditText
-            android:id="@+id/etWifiPassword"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_password"
-            android:inputType="textPassword"
-            android:layout_marginBottom="24dp"/>
-
-        <!-- Bluetooth Configuration -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/lbl_bluetooth"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+                android:inputType="textPassword"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <Button
-            android:id="@+id/btnConnectBluetooth"
+            android:id="@+id/btnResetPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/btn_connect_bluetooth"
-            android:layout_marginBottom="8dp"/>
-
-        <TextView
-            android:id="@+id/tvConnectedDevice"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/lbl_connected_device"
-            android:layout_marginBottom="24dp"/>
-
-        <!-- Data Storage -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/lbl_storage"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
-
-        <CheckBox
-            android:id="@+id/cbStorage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/opt_save_local"
-            android:layout_marginBottom="32dp"/>
-
-        <Button
-            android:id="@+id/btnSaveSettings"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_save_settings"/>
+            android:text="Reset Password"/>
 
     </LinearLayout>
 </ScrollView>
