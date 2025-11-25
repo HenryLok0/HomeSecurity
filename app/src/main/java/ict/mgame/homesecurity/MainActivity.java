@@ -242,6 +242,18 @@ public class MainActivity extends AppCompatActivity {
                             this, cameraSelector, preview, imageCapture, videoCapture);
                 } catch (Exception exc) {
                     Log.e(TAG, "Use case binding failed", exc);
+                    try {
+                        cameraProvider.unbindAll();
+                        cameraProvider.bindToLifecycle(
+                                this, cameraSelector, preview, imageCapture);
+                        runOnUiThread(() -> {
+                            Toast.makeText(MainActivity.this, "Video recording disabled: Device limit reached", Toast.LENGTH_LONG).show();
+                            btnRecordVideo.setEnabled(false);
+                        });
+                    } catch (Exception e) {
+                        Log.e(TAG, "Use case binding failed again", e);
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Camera initialization failed", Toast.LENGTH_SHORT).show());
+                    }
                 }
 
             } catch (ExecutionException | InterruptedException e) {
