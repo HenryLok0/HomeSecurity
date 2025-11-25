@@ -3,8 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
-    app:cardCornerRadius="8dp"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="12dp"
     app:cardElevation="4dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -16,7 +16,7 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:scaleType="centerCrop"
-            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintDimensionRatio="16:9"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -27,6 +27,9 @@
             android:layout_height="48dp"
             android:src="@android:drawable/ic_media_play"
             android:visibility="gone"
+            android:background="@drawable/circle_background_semi_transparent"
+            android:padding="12dp"
+            app:tint="#FFFFFF"
             app:layout_constraintBottom_toBottomOf="@+id/ivThumbnail"
             app:layout_constraintEnd_toEndOf="@+id/ivThumbnail"
             app:layout_constraintStart_toStartOf="@+id/ivThumbnail"
@@ -36,7 +39,7 @@
             android:id="@+id/viewSelection"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:background="#80000000"
+            android:background="#991A237E"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="@+id/ivThumbnail"
             app:layout_constraintEnd_toEndOf="@+id/ivThumbnail"
@@ -49,6 +52,7 @@
             android:layout_height="32dp"
             android:src="@android:drawable/checkbox_on_background"
             android:visibility="gone"
+            app:tint="#FFFFFF"
             app:layout_constraintBottom_toBottomOf="@+id/ivThumbnail"
             app:layout_constraintEnd_toEndOf="@+id/ivThumbnail"
             android:layout_margin="8dp"/>

@@ -118,8 +118,10 @@ public class MainActivity extends AppCompatActivity {
         btnNotifications.setOnClickListener(v -> showNotificationHistory());
 
         btnLogout.setOnClickListener(v -> {
-            Toast.makeText(MainActivity.this, "Logout clicked", Toast.LENGTH_SHORT).show();
-            finish();
+            Toast.makeText(MainActivity.this, "Logged out", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
         });
 
         cameraExecutor = Executors.newSingleThreadExecutor();
@@ -198,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
                 .start(ContextCompat.getMainExecutor(this), recordEvent -> {
                     if (recordEvent instanceof VideoRecordEvent.Start) {
                         btnRecordVideo.setText("Stop");
-                        btnRecordVideo.setBackgroundColor(0xFFFF0000); // Red
+                        btnRecordVideo.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFF0000)); // Red
                         btnRecordVideo.setEnabled(true);
                     } else if (recordEvent instanceof VideoRecordEvent.Finalize) {
                         if (!((VideoRecordEvent.Finalize) recordEvent).hasError()) {
@@ -211,7 +213,7 @@ public class MainActivity extends AppCompatActivity {
                             Log.e(TAG, "Video capture ends with error: " + ((VideoRecordEvent.Finalize) recordEvent).getError());
                         }
                         btnRecordVideo.setText("Record");
-                        btnRecordVideo.setBackgroundColor(0xFF4CAF50); // Green (Default) - Adjust to your theme color
+                        btnRecordVideo.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFD32F2F)); // Default Red
                         btnRecordVideo.setEnabled(true);
                     }
                 });
