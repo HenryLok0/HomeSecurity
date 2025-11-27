@@ -106,6 +106,14 @@
                             android:id="@+id/viewFinder"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent" />
+
+                        <ImageView
+                            android:id="@+id/remoteCameraView"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:visibility="gone"
+                            android:scaleType="fitCenter"
+                            android:contentDescription="Remote Camera View" />
                     </FrameLayout>
 
                     <LinearLayout

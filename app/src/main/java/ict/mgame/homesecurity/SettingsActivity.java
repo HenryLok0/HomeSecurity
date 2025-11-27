@@ -28,6 +28,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     private BluetoothAdapter bluetoothAdapter;
     private ArrayList<String> deviceList;
+    private ArrayList<BluetoothDevice> bluetoothDevices;
     private ArrayAdapter<String> deviceAdapter;
 
     @Override
@@ -45,11 +46,21 @@ public class SettingsActivity extends AppCompatActivity {
         // Initialize Bluetooth Adapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         deviceList = new ArrayList<>();
+        bluetoothDevices = new ArrayList<>();
         deviceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, deviceList);
         lvBluetoothDevices.setAdapter(deviceAdapter);
 
         // Load Bluetooth Devices
         loadConnectedBluetoothDevices();
+
+        // Set List Item Click Listener
+        lvBluetoothDevices.setOnItemClickListener((parent, view, position, id) -> {
+            BluetoothDevice device = bluetoothDevices.get(position);
+            android.content.Intent resultIntent = new android.content.Intent();
+            resultIntent.putExtra("device_address", device.getAddress());
+            setResult(RESULT_OK, resultIntent);
+            finish();
+        });
 
         // Set Reset Password Button Listener
         btnResetPassword.setOnClickListener(new View.OnClickListener() {
@@ -75,15 +86,13 @@ public class SettingsActivity extends AppCompatActivity {
             // Note: In a real app, you need to handle runtime permissions for BLUETOOTH_CONNECT
             Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
             deviceList.clear();
+            bluetoothDevices.clear();
 
             if (pairedDevices != null && !pairedDevices.isEmpty()) {
                 for (BluetoothDevice device : pairedDevices) {
-                    // Showing Name and Bond State (Paired)
-                    String state = "Paired"; 
-                    if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-                        state = "Paired";
-                    }
-                    deviceList.add(device.getName() + "\nState: " + state);
+                    // Showing Name and Address
+                    deviceList.add(device.getName() + "\n" + device.getAddress());
+                    bluetoothDevices.add(device);
                 }
                 lvBluetoothDevices.setVisibility(View.VISIBLE);
                 layoutNoDevice.setVisibility(View.GONE);
