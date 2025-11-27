@@ -24,6 +24,7 @@ public class LoginActivity extends AppCompatActivity {
     private boolean isLoginMode = true;
     private SharedPreferences sharedPreferences;
     private static final String PREF_NAME = "UserPrefs";
+    private static final String KEY_IS_LOGGED_IN = "isLoggedIn";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,8 +39,11 @@ public class LoginActivity extends AppCompatActivity {
 
         sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
 
-        // Check if user is already logged in (optional, but good UX)
-        // For now, we always show login screen as per request "after login is now the main page"
+        // Check if user is already logged in
+        if (sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)) {
+            navigateToMain();
+            return;
+        }
 
         updateUI();
 
@@ -91,6 +95,11 @@ public class LoginActivity extends AppCompatActivity {
 
         if (storedPassword != null && storedPassword.equals(password)) {
             Toast.makeText(this, "Login Successful", Toast.LENGTH_SHORT).show();
+            
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putBoolean(KEY_IS_LOGGED_IN, true);
+            editor.apply();
+            
             navigateToMain();
         } else {
             Toast.makeText(this, "Invalid Username or Password", Toast.LENGTH_SHORT).show();
@@ -105,6 +114,7 @@ public class LoginActivity extends AppCompatActivity {
 
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(username, password);
+        editor.putBoolean(KEY_IS_LOGGED_IN, true);
         editor.apply();
 
         Toast.makeText(this, "Account Created Successfully", Toast.LENGTH_SHORT).show();
