@@ -118,6 +118,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "HomeSecurityPrefs";
     private static final String ALERTS_KEY = "motion_alerts"; // stored as JSON array string
     private static final int MAX_STORED_ALERTS = 200;
+    // motion detection smoothing
+    private static final int MOTION_WINDOW_SAMPLES = 3; // average over 3 frames
+    private int motionSampleCount = 0;
+    private double motionAccumulator = 0.0;
 
     // Bluetooth variables
     private BluetoothAdapter bluetoothAdapter;
@@ -394,32 +398,82 @@ public class MainActivity extends AppCompatActivity {
     private void showNotificationHistory() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String json = prefs.getString(ALERTS_KEY, null);
-        String[] events;
         if (json == null) {
-            events = new String[]{"No motion alerts"};
-        } else {
-            try {
-                JSONArray arr = new JSONArray(json);
-                int n = arr.length();
-                if (n == 0) {
-                    events = new String[]{"No motion alerts"};
-                } else {
-                    events = new String[n];
-                    for (int i = 0; i < n; i++) {
-                        // show newest first
-                        events[i] = arr.optString(n - 1 - i);
-                    }
-                }
-            } catch (JSONException e) {
-                events = new String[]{"No motion alerts"};
-            }
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Motion Events");
+            builder.setItems(new String[]{"No motion alerts"}, null);
+            builder.setPositiveButton("Close", null);
+            builder.show();
+            return;
         }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Motion Events");
-        builder.setItems(events, null);
-        builder.setPositiveButton("Close", null);
-        builder.show();
+        try {
+            JSONArray arr = new JSONArray(json);
+            int n = arr.length();
+            if (n == 0) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("Motion Events");
+                builder.setItems(new String[]{"No motion alerts"}, null);
+                builder.setPositiveButton("Close", null);
+                builder.show();
+                return;
+            }
+
+            String[] items = new String[n];
+            final String[] uris = new String[n];
+            for (int i = 0; i < n; i++) {
+                // newest first
+                org.json.JSONObject obj = arr.getJSONObject(n - 1 - i);
+                items[i] = obj.optString("message", "(no message)");
+                String u = obj.optString("uri", null);
+                uris[i] = (u == null || u.equals("null")) ? null : u;
+            }
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Motion Events");
+            builder.setItems(items, (dialog, which) -> {
+                // show image if available
+                String uriStr = uris[which];
+                if (uriStr == null) {
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setTitle(items[which])
+                            .setMessage("No photo available for this alert")
+                            .setPositiveButton("Close", null)
+                            .show();
+                } else {
+                    // load and show image in dialog
+                    try {
+                        android.net.Uri uri = android.net.Uri.parse(uriStr);
+                        InputStream is = getContentResolver().openInputStream(uri);
+                        Bitmap bmp = BitmapFactory.decodeStream(is);
+                        is.close();
+                        ImageView iv = new ImageView(MainActivity.this);
+                        iv.setImageBitmap(bmp);
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle(items[which])
+                                .setView(iv)
+                                .setPositiveButton("Close", null)
+                                .show();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to load alert image", e);
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle(items[which])
+                                .setMessage("Failed to load image")
+                                .setPositiveButton("Close", null)
+                                .show();
+                    }
+                }
+            });
+            builder.setPositiveButton("Close", null);
+            builder.show();
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to parse alerts JSON", e);
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle("Motion Events");
+            builder.setItems(new String[]{"No motion alerts"}, null);
+            builder.setPositiveButton("Close", null);
+            builder.show();
+        }
     }
     
     public void updateDetectionStatus(String personName, boolean isFamily) {
@@ -459,11 +513,18 @@ public class MainActivity extends AppCompatActivity {
         if (previousFrame != null && currentFrame.length == previousFrame.length) {
             // Calculate average difference - improved algorithm for slow motion
             double difference = calculateMotionDifference(previousFrame, currentFrame);
-            
-            Log.d(TAG, "Motion difference: " + difference);
-            
-            if (difference > MOTION_THRESHOLD) {
-                handleMotionDetected();
+            // smoothing: moving average over MOTION_WINDOW_SAMPLES
+            motionAccumulator += difference;
+            motionSampleCount++;
+            if (motionSampleCount >= MOTION_WINDOW_SAMPLES) {
+                double avg = motionAccumulator / motionSampleCount;
+                Log.d(TAG, "Motion avg over " + motionSampleCount + " frames: " + avg);
+                if (avg > MOTION_THRESHOLD) {
+                    handleMotionDetected();
+                }
+                // reset window
+                motionAccumulator = 0.0;
+                motionSampleCount = 0;
             }
         }
         
@@ -499,18 +560,53 @@ public class MainActivity extends AppCompatActivity {
         // Show notification only if cooldown has passed
         if (currentTime - lastMotionNotificationTime >= MOTION_NOTIFICATION_COOLDOWN_MS) {
             lastMotionNotificationTime = currentTime;
-            
             String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(currentTime);
             String message = "Motion detected at " + time;
             runOnUiThread(() -> {
                 tvNotification.setText(message);
                 Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
             });
-            // persist alert
-            addMotionAlert(message);
-            
+            // attempt to capture a photo; when saved, the callback will persist the alert with photo URI
+            takePhotoForAlert(message);
             Log.d(TAG, "Motion detected at " + currentTime);
         }
+    }
+
+    private void takePhotoForAlert(String message) {
+        if (imageCapture == null) {
+            addMotionAlert(message, null);
+            return;
+        }
+
+        String name = new SimpleDateFormat(FILENAME_FORMAT, Locale.US)
+                .format(System.currentTimeMillis());
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/HomeSecurity-Image");
+        }
+
+        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(
+                getContentResolver(),
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues
+        ).build();
+
+        imageCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(this), new ImageCapture.OnImageSavedCallback() {
+            @Override
+            public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                String uri = (outputFileResults.getSavedUri() != null) ? outputFileResults.getSavedUri().toString() : null;
+                addMotionAlert(message, uri);
+                Log.d(TAG, "Alert photo saved: " + uri);
+            }
+
+            @Override
+            public void onError(@NonNull ImageCaptureException exception) {
+                Log.e(TAG, "Failed to save alert photo", exception);
+                addMotionAlert(message, null);
+            }
+        });
     }
 
     private void addMotionAlert(String message) {
@@ -518,19 +614,40 @@ public class MainActivity extends AppCompatActivity {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             String json = prefs.getString(ALERTS_KEY, null);
             JSONArray arr = (json == null) ? new JSONArray() : new JSONArray(json);
-
-            // append, keep size bounded
-            arr.put(message);
+            // store as object with possible image URI
+            org.json.JSONObject obj = new org.json.JSONObject();
+            obj.put("message", message);
+            obj.put("uri", org.json.JSONObject.NULL);
+            arr.put(obj);
             if (arr.length() > MAX_STORED_ALERTS) {
-                // remove oldest (index 0) until size ok
-                JSONArray newArr = new JSONArray();
                 int start = arr.length() - MAX_STORED_ALERTS;
+                JSONArray newArr = new JSONArray();
                 for (int i = start; i < arr.length(); i++) {
-                    newArr.put(arr.optString(i));
+                    newArr.put(arr.opt(i));
                 }
                 arr = newArr;
             }
+            prefs.edit().putString(ALERTS_KEY, arr.toString()).apply();
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to save motion alert", e);
+        }
+    }
 
+    private void addMotionAlert(String message, String uriString) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            String json = prefs.getString(ALERTS_KEY, null);
+            JSONArray arr = (json == null) ? new JSONArray() : new JSONArray(json);
+            org.json.JSONObject obj = new org.json.JSONObject();
+            obj.put("message", message);
+            if (uriString != null) obj.put("uri", uriString); else obj.put("uri", org.json.JSONObject.NULL);
+            arr.put(obj);
+            if (arr.length() > MAX_STORED_ALERTS) {
+                int start = arr.length() - MAX_STORED_ALERTS;
+                JSONArray newArr = new JSONArray();
+                for (int i = start; i < arr.length(); i++) newArr.put(arr.opt(i));
+                arr = newArr;
+            }
             prefs.edit().putString(ALERTS_KEY, arr.toString()).apply();
         } catch (JSONException e) {
             Log.e(TAG, "Failed to save motion alert", e);
