@@ -54,9 +54,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.io.ByteArrayOutputStream;
-import android.graphics.ImageFormat;
-import android.graphics.YuvImage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import java.text.SimpleDateFormat;
@@ -115,17 +112,14 @@ public class MainActivity extends AppCompatActivity {
     private boolean isMotionSensorEnabled = false;
     private long lastMotionNotificationTime = 0;
     private static final long MOTION_NOTIFICATION_COOLDOWN_MS = 3000; // 3 seconds cooldown
-    private float[] previousSmallFrame; // downscaled grayscale frame
-    private static final double MOTION_THRESHOLD = 6.0; // Lower threshold for slow motion (tunable)
-    // EMA smoothing for slow movement
-    private double emaMotion = 0.0;
-    private static final double EMA_ALPHA = 0.5; // smoothing factor (0..1)
+    private byte[] previousFrame;
+    private static final double MOTION_THRESHOLD = 15.0; // Adjusted for slow motion detection
     // Alerts storage
     private static final String PREFS_NAME = "HomeSecurityPrefs";
     private static final String ALERTS_KEY = "motion_alerts"; // stored as JSON array string
     private static final int MAX_STORED_ALERTS = 200;
     // motion detection smoothing
-    private static final int MOTION_WINDOW_SAMPLES = 2; // average over 2 frames for responsiveness
+    private static final int MOTION_WINDOW_SAMPLES = 3; // average over 3 frames
     private int motionSampleCount = 0;
     private double motionAccumulator = 0.0;
 
@@ -334,9 +328,9 @@ public class MainActivity extends AppCompatActivity {
                         if (isMotionSensorEnabled) {
                             analyzeFrameForMotion(image);
                         } else {
-                            previousSmallFrame = null;
-                            image.close();
+                            previousFrame = null;
                         }
+                        image.close();
                     }
                 });
 
@@ -489,9 +483,7 @@ public class MainActivity extends AppCompatActivity {
     private void toggleMotionSensor() {
         isMotionSensorEnabled = !isMotionSensorEnabled;
         if (!isMotionSensorEnabled) {
-            previousSmallFrame = null;
-            motionAccumulator = 0.0;
-            motionSampleCount = 0;
+            previousFrame = null;
         }
         updateMotionSensorButton();
         Toast.makeText(this, "Motion sensor " + (isMotionSensorEnabled ? "enabled" : "disabled"), Toast.LENGTH_SHORT).show();
@@ -511,117 +503,55 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void analyzeFrameForMotion(ImageProxy image) {
-        // convert to small grayscale (e.g., 48x32)
-        final int TW = 48;
-        final int TH = 32;
-        float[] small = imageProxyToGrayscaleSmall(image, TW, TH);
-        if (small.length == 0) return;
-
-        if (previousSmallFrame != null && previousSmallFrame.length == small.length) {
-            double diff = averageAbsDifference(previousSmallFrame, small);
-            // EMA smoothing
-            emaMotion = EMA_ALPHA * diff + (1.0 - EMA_ALPHA) * emaMotion;
-            Log.d(TAG, String.format("Small diff: %.2f | EMA: %.2f | Threshold: %.2f", diff, emaMotion, MOTION_THRESHOLD));
-            if (emaMotion > MOTION_THRESHOLD) {
-                Log.d(TAG, "MOTION TRIGGERED! (EMA)");
-                handleMotionDetected();
-                // reduce EMA after trigger to avoid immediate re-trigger
-                emaMotion *= 0.2;
-            }
-        } else {
-            Log.d(TAG, "Initialized small frame or size mismatch");
-            // initialize ema with zero
-            emaMotion = 0.0;
-        }
-
-        previousSmallFrame = small;
-    }
-
-    // Convert ImageProxy to a small grayscale float array (0..255)
-    private float[] imageProxyToGrayscaleSmall(ImageProxy image, int targetW, int targetH) {
+        // Get Y plane from NV21 format
         ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
         ByteBuffer yBuffer = yPlane.getBuffer();
-        int width = image.getWidth();
-        int height = image.getHeight();
+        
+        byte[] currentFrame = new byte[yBuffer.remaining()];
+        yBuffer.get(currentFrame);
 
-        // Build NV21 byte[] from ImageProxy (YUV_420_888 -> NV21)
-        byte[] nv21 = new byte[width * height * 3 / 2];
-        yBuffer.get(nv21, 0, yBuffer.remaining());
-        // Note: this simple approach assumes contiguous Y plane at start; if not, fallback below
-        // Fallback: build NV21 properly
-        if (yBuffer.remaining() == 0 && nv21.length < 1) {
-            // unexpected, return empty
-            return new float[0];
-        }
-
-        // Use YuvImage to get a compressed JPEG then decode to bitmap (simpler, slightly heavier)
-        try {
-            // Reconstruct NV21 properly from planes
-            ImageProxy.PlaneProxy uPlane = image.getPlanes()[1];
-            ImageProxy.PlaneProxy vPlane = image.getPlanes()[2];
-            int ySize = yPlane.getBuffer().remaining();
-            byte[] yBytes = new byte[ySize];
-            yPlane.getBuffer().rewind();
-            yPlane.getBuffer().get(yBytes);
-
-            int uvRowStride = uPlane.getRowStride();
-            int uvPixelStride = uPlane.getPixelStride();
-            int chromaHeight = height / 2;
-
-            byte[] nv21Full = new byte[width * height + 2 * (width / 2) * chromaHeight];
-            System.arraycopy(yBytes, 0, nv21Full, 0, yBytes.length);
-
-            // interleave VU
-            int pos = width * height;
-            ByteBuffer uBuf = uPlane.getBuffer();
-            ByteBuffer vBuf = vPlane.getBuffer();
-            uBuf.rewind();
-            vBuf.rewind();
-
-            for (int row = 0; row < chromaHeight; row++) {
-                int rowStartU = row * uvRowStride;
-                int rowStartV = row * uvRowStride;
-                for (int col = 0; col < width / 2; col++) {
-                    int uIndex = rowStartU + col * uvPixelStride;
-                    int vIndex = rowStartV + col * uvPixelStride;
-                    byte u = uBuf.get(uIndex);
-                    byte v = vBuf.get(vIndex);
-                    nv21Full[pos++] = v;
-                    nv21Full[pos++] = u;
+        if (previousFrame != null && currentFrame.length == previousFrame.length) {
+            // Calculate average difference - improved algorithm for slow motion
+            double difference = calculateMotionDifference(previousFrame, currentFrame);
+            // smoothing: moving average over MOTION_WINDOW_SAMPLES
+            motionAccumulator += difference;
+            motionSampleCount++;
+            if (motionSampleCount >= MOTION_WINDOW_SAMPLES) {
+                double avg = motionAccumulator / motionSampleCount;
+                Log.d(TAG, "Motion avg over " + motionSampleCount + " frames: " + avg);
+                if (avg > MOTION_THRESHOLD) {
+                    handleMotionDetected();
                 }
+                // reset window
+                motionAccumulator = 0.0;
+                motionSampleCount = 0;
             }
-
-            YuvImage yuv = new YuvImage(nv21Full, ImageFormat.NV21, width, height, null);
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            yuv.compressToJpeg(new android.graphics.Rect(0, 0, width, height), 60, baos);
-            byte[] jpegBytes = baos.toByteArray();
-            Bitmap bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length);
-            if (bmp == null) return new float[0];
-            Bitmap small = Bitmap.createScaledBitmap(bmp, targetW, targetH, true);
-            int[] pixels = new int[targetW * targetH];
-            small.getPixels(pixels, 0, targetW, 0, 0, targetW, targetH);
-            float[] gray = new float[targetW * targetH];
-            for (int i = 0; i < pixels.length; i++) {
-                int c = pixels[i];
-                int r = (c >> 16) & 0xFF;
-                int g = (c >> 8) & 0xFF;
-                int b = c & 0xFF;
-                gray[i] = (0.299f * r + 0.587f * g + 0.114f * b);
-            }
-            bmp.recycle();
-            small.recycle();
-            return gray;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to convert ImageProxy to small grayscale", e);
-            return new float[0];
         }
+        
+        previousFrame = currentFrame;
     }
 
-    private double averageAbsDifference(float[] a, float[] b) {
-        if (a.length == 0 || b.length == 0 || a.length != b.length) return 0;
-        double acc = 0.0;
-        for (int i = 0; i < a.length; i++) acc += Math.abs(a[i] - b[i]);
-        return acc / a.length;
+    private double calculateMotionDifference(byte[] frame1, byte[] frame2) {
+        if (frame1.length == 0 || frame2.length == 0) {
+            return 0;
+        }
+
+        long difference = 0;
+        int sampleStep = 8; // Sample every 8th pixel for performance
+        int sampleCount = 0;
+
+        for (int i = 0; i < frame1.length; i += sampleStep) {
+            int val1 = frame1[i] & 0xFF;
+            int val2 = frame2[i] & 0xFF;
+            difference += Math.abs(val2 - val1);
+            sampleCount++;
+        }
+
+        if (sampleCount == 0) {
+            return 0;
+        }
+
+        return (double) difference / sampleCount;
     }
 
     private void handleMotionDetected() {
