@@ -53,6 +53,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -734,16 +735,108 @@ public class MainActivity extends AppCompatActivity {
 
         public void run() {
             Log.d(TAG, "BEGIN mConnectedThread");
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] readTmp = new byte[4096];
             while (isRunning) {
                 try {
-                    if (mmInStream.available() > 0) {
-                        // Note: This assumes the Arduino sends a valid image stream (e.g. JPEG)
-                        // If sending raw bytes, you need to buffer and construct the image manually.
-                        Thread.sleep(100); // Wait for data
-                        Bitmap bitmap = BitmapFactory.decodeStream(mmInStream);
-                        if (bitmap != null) {
-                            runOnUiThread(() -> remoteCameraView.setImageBitmap(bitmap));
+                    int available = mmInStream.available();
+                    if (available > 0) {
+                        int toRead = Math.min(available, readTmp.length);
+                        int read = mmInStream.read(readTmp, 0, toRead);
+                        if (read > 0) {
+                            buffer.write(readTmp, 0, read);
+                            byte[] data = buffer.toByteArray();
+
+                            // Try to extract JPEG frames if present (SOI 0xFFD8 .. EOI 0xFFD9)
+                            int start = -1;
+                            int end = -1;
+                            for (int i = 0; i < data.length - 1; i++) {
+                                if ((data[i] & 0xFF) == 0xFF && (data[i+1] & 0xFF) == 0xD8) {
+                                    start = i;
+                                    break;
+                                }
+                            }
+                            if (start >= 0) {
+                                for (int j = start + 2; j < data.length - 1; j++) {
+                                    if ((data[j] & 0xFF) == 0xFF && (data[j+1] & 0xFF) == 0xD9) {
+                                        end = j+1;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (start >= 0 && end > start) {
+                                try {
+                                    byte[] jpeg = new byte[end - start + 1];
+                                    System.arraycopy(data, start, jpeg, 0, jpeg.length);
+                                    final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                                    if (bmp != null) {
+                                        runOnUiThread(() -> remoteCameraView.setImageBitmap(bmp));
+                                    }
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Failed to decode JPEG chunk", e);
+                                }
+                                // remove processed bytes from buffer
+                                byte[] remaining = new byte[data.length - (end + 1)];
+                                System.arraycopy(data, end + 1, remaining, 0, remaining.length);
+                                buffer.reset();
+                                buffer.write(remaining);
+                                data = buffer.toByteArray();
+                            }
+
+                            // Process textual lines (DHT messages) separated by newline
+                            String text = null;
+                            try {
+                                text = new String(data, "UTF-8");
+                            } catch (Exception e) {
+                                text = null;
+                            }
+                            if (text != null && text.contains("\n")) {
+                                String[] parts = text.split("\\r?\\n");
+                                int processedUpTo = 0;
+                                for (int i = 0; i < parts.length; i++) {
+                                    String line = parts[i].trim();
+                                    // If this is the last part and original text did not end with newline, keep it in buffer
+                                    boolean isLast = (i == parts.length - 1) && !text.endsWith("\n") && !text.endsWith("\r\n");
+                                    if (line.length() == 0) {
+                                        processedUpTo += parts[i].getBytes().length + 1; // approximate
+                                        continue;
+                                    }
+                                    // Try to parse DHT patterns like: DHT:23.4,56.0 or 23.4,56.0
+                                    String candidate = line;
+                                    if (candidate.toUpperCase().startsWith("DHT:")) candidate = candidate.substring(4).trim();
+                                    // remove any non number/comma/dot characters at ends
+                                    candidate = candidate.replaceAll("[^0-9.,-]", "");
+                                    if (candidate.contains(",")) {
+                                        String[] kv = candidate.split(",");
+                                        if (kv.length >= 2) {
+                                            try {
+                                                float t = Float.parseFloat(kv[0]);
+                                                float h = Float.parseFloat(kv[1]);
+                                                Log.d(TAG, "Parsed DHT -> T=" + t + " H=" + h);
+                                                // persist via SettingsActivity helper
+                                                SettingsActivity.saveDhtValues(MainActivity.this, t, h);
+                                                // optional: update status text
+                                                runOnUiThread(() -> tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h)));
+                                            } catch (NumberFormatException nfe) {
+                                                // ignore parse error
+                                            }
+                                        }
+                                    }
+                                    processedUpTo += parts[i].getBytes().length + 1;
+                                    if (isLast) break;
+                                }
+                                // remove processed text bytes from buffer
+                                if (processedUpTo > 0) {
+                                    byte[] remaining = new byte[Math.max(0, data.length - processedUpTo)];
+                                    System.arraycopy(data, processedUpTo, remaining, 0, remaining.length);
+                                    buffer.reset();
+                                    buffer.write(remaining);
+                                }
+                            }
                         }
+                    } else {
+                        Thread.sleep(50);
                     }
                 } catch (IOException | InterruptedException e) {
                     Log.e(TAG, "disconnected", e);

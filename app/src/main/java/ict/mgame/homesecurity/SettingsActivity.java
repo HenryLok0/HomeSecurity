@@ -4,6 +4,9 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.widget.TextView;
+import android.widget.Button;
+import java.util.Locale;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -25,6 +28,10 @@ public class SettingsActivity extends AppCompatActivity {
     private TextInputEditText etNewPassword;
     private TextInputEditText etConfirmPassword;
     private Button btnResetPassword;
+    // DHT11 UI
+    private TextView tvTemperature;
+    private TextView tvHumidity;
+    private Button btnRefreshDht;
 
     private BluetoothAdapter bluetoothAdapter;
     private ArrayList<String> deviceList;
@@ -42,6 +49,16 @@ public class SettingsActivity extends AppCompatActivity {
         etNewPassword = findViewById(R.id.etNewPassword);
         etConfirmPassword = findViewById(R.id.etConfirmPassword);
         btnResetPassword = findViewById(R.id.btnResetPassword);
+
+        // DHT11 Views
+        tvTemperature = findViewById(R.id.tvTemperature);
+        tvHumidity = findViewById(R.id.tvHumidity);
+        btnRefreshDht = findViewById(R.id.btnRefreshDht);
+
+        // Load saved DHT values
+        loadDhtValuesToUI();
+
+        btnRefreshDht.setOnClickListener(v -> loadDhtValuesToUI());
 
         // Initialize Bluetooth Adapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -127,5 +144,44 @@ public class SettingsActivity extends AppCompatActivity {
         // Clear fields
         etNewPassword.setText("");
         etConfirmPassword.setText("");
+    }
+
+    // DHT11 persistence keys
+    private static final String PREFS_NAME = "HomeSecurityPrefs";
+    private static final String KEY_DHT_TEMP = "dht_temp";
+    private static final String KEY_DHT_HUM = "dht_humidity";
+
+    private void loadDhtValuesToUI() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        float temp = prefs.getFloat(KEY_DHT_TEMP, Float.NaN);
+        float hum = prefs.getFloat(KEY_DHT_HUM, Float.NaN);
+        if (!Float.isNaN(temp)) {
+            tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
+        } else {
+            tvTemperature.setText("-- °C");
+        }
+        if (!Float.isNaN(hum)) {
+            tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", hum));
+        } else {
+            tvHumidity.setText("-- %");
+        }
+    }
+
+    public static void saveDhtValues(Context ctx, float temp, float humidity) {
+        try {
+            SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().putFloat(KEY_DHT_TEMP, temp).putFloat(KEY_DHT_HUM, humidity).apply();
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
+    // Optional: call this from activity instance when live update arrives
+    public void onDhtUpdate(float temp, float humidity) {
+        saveDhtValues(this, temp, humidity);
+        runOnUiThread(() -> {
+            tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
+            tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", humidity));
+        });
     }
 }
