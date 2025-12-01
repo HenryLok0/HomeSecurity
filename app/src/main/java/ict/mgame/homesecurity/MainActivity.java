@@ -40,16 +40,22 @@ import androidx.camera.video.Recording;
 import androidx.camera.video.VideoCapture;
 import androidx.camera.video.VideoRecordEvent;
 import androidx.camera.view.PreviewView;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageProxy;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import org.json.JSONArray;
+import org.json.JSONException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -90,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnHistory;
     private Button btnNotifications;
     private Button btnLogout;
+    private MaterialButton btnMotionSensor;
     private TextView tvStatus;
     private TextView tvNotification;
     private PreviewView viewFinder;
@@ -98,7 +105,19 @@ public class MainActivity extends AppCompatActivity {
     private ImageCapture imageCapture;
     private VideoCapture<Recorder> videoCapture;
     private Recording recording;
+    private ImageAnalysis imageAnalysis;
     private ExecutorService cameraExecutor;
+
+    // Motion detection variables
+    private boolean isMotionSensorEnabled = false;
+    private long lastMotionNotificationTime = 0;
+    private static final long MOTION_NOTIFICATION_COOLDOWN_MS = 3000; // 3 seconds cooldown
+    private byte[] previousFrame;
+    private static final double MOTION_THRESHOLD = 15.0; // Adjusted for slow motion detection
+    // Alerts storage
+    private static final String PREFS_NAME = "HomeSecurityPrefs";
+    private static final String ALERTS_KEY = "motion_alerts"; // stored as JSON array string
+    private static final int MAX_STORED_ALERTS = 200;
 
     // Bluetooth variables
     private BluetoothAdapter bluetoothAdapter;
@@ -136,6 +155,7 @@ public class MainActivity extends AppCompatActivity {
         btnHistory = findViewById(R.id.btnHistory);
         btnNotifications = findViewById(R.id.btnNotifications);
         btnLogout = findViewById(R.id.btnLogout);
+        btnMotionSensor = findViewById(R.id.btnMotionSensor);
         tvStatus = findViewById(R.id.tvStatus);
         tvNotification = findViewById(R.id.tvNotification);
         viewFinder = findViewById(R.id.viewFinder);
@@ -180,6 +200,10 @@ public class MainActivity extends AppCompatActivity {
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
         });
+
+        // Motion Sensor Button Listener
+        btnMotionSensor.setOnClickListener(v -> toggleMotionSensor());
+        updateMotionSensorButton();
 
         cameraExecutor = Executors.newSingleThreadExecutor();
     }
@@ -289,6 +313,22 @@ public class MainActivity extends AppCompatActivity {
                 preview.setSurfaceProvider(viewFinder.getSurfaceProvider());
 
                 imageCapture = new ImageCapture.Builder().build();
+                
+                // Motion Detection Image Analysis
+                imageAnalysis = new ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build();
+                imageAnalysis.setAnalyzer(cameraExecutor, new ImageAnalysis.Analyzer() {
+                    @Override
+                    public void analyze(@NonNull ImageProxy image) {
+                        if (isMotionSensorEnabled) {
+                            analyzeFrameForMotion(image);
+                        } else {
+                            previousFrame = null;
+                        }
+                        image.close();
+                    }
+                });
 
                 Recorder recorder = new Recorder.Builder()
                         .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
@@ -300,13 +340,13 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     cameraProvider.unbindAll();
                     cameraProvider.bindToLifecycle(
-                            this, cameraSelector, preview, imageCapture, videoCapture);
+                            this, cameraSelector, preview, imageCapture, videoCapture, imageAnalysis);
                 } catch (Exception exc) {
                     Log.e(TAG, "Use case binding failed", exc);
                     try {
                         cameraProvider.unbindAll();
                         cameraProvider.bindToLifecycle(
-                                this, cameraSelector, preview, imageCapture);
+                                this, cameraSelector, preview, imageCapture, imageAnalysis);
                         runOnUiThread(() -> {
                             Toast.makeText(MainActivity.this, "Video recording disabled: Device limit reached", Toast.LENGTH_LONG).show();
                             btnRecordVideo.setEnabled(false);
@@ -352,12 +392,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showNotificationHistory() {
-        String[] events = {
-                "Motion detected - 10:45 AM",
-                "Motion detected - 11:30 AM",
-                "Motion detected - 02:15 PM",
-                "Motion detected - 04:20 PM"
-        };
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String json = prefs.getString(ALERTS_KEY, null);
+        String[] events;
+        if (json == null) {
+            events = new String[]{"No motion alerts"};
+        } else {
+            try {
+                JSONArray arr = new JSONArray(json);
+                int n = arr.length();
+                if (n == 0) {
+                    events = new String[]{"No motion alerts"};
+                } else {
+                    events = new String[n];
+                    for (int i = 0; i < n; i++) {
+                        // show newest first
+                        events[i] = arr.optString(n - 1 - i);
+                    }
+                }
+            } catch (JSONException e) {
+                events = new String[]{"No motion alerts"};
+            }
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Motion Events");
@@ -368,6 +424,117 @@ public class MainActivity extends AppCompatActivity {
     
     public void updateDetectionStatus(String personName, boolean isFamily) {
         // Implementation kept for compatibility
+    }
+
+    private void toggleMotionSensor() {
+        isMotionSensorEnabled = !isMotionSensorEnabled;
+        if (!isMotionSensorEnabled) {
+            previousFrame = null;
+        }
+        updateMotionSensorButton();
+        Toast.makeText(this, "Motion sensor " + (isMotionSensorEnabled ? "enabled" : "disabled"), Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateMotionSensorButton() {
+        if (btnMotionSensor == null) return;
+        if (isMotionSensorEnabled) {
+            btnMotionSensor.setText("Sensor ON");
+            btnMotionSensor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF2E7D32)); // Green
+            btnMotionSensor.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF)); // White
+        } else {
+            btnMotionSensor.setText("Sensor OFF");
+            btnMotionSensor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0x66000000)); // Semi-transparent black
+            btnMotionSensor.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF)); // White
+        }
+    }
+
+    private void analyzeFrameForMotion(ImageProxy image) {
+        // Get Y plane from NV21 format
+        ImageProxy.PlaneProxy yPlane = image.getPlanes()[0];
+        ByteBuffer yBuffer = yPlane.getBuffer();
+        
+        byte[] currentFrame = new byte[yBuffer.remaining()];
+        yBuffer.get(currentFrame);
+
+        if (previousFrame != null && currentFrame.length == previousFrame.length) {
+            // Calculate average difference - improved algorithm for slow motion
+            double difference = calculateMotionDifference(previousFrame, currentFrame);
+            
+            Log.d(TAG, "Motion difference: " + difference);
+            
+            if (difference > MOTION_THRESHOLD) {
+                handleMotionDetected();
+            }
+        }
+        
+        previousFrame = currentFrame;
+    }
+
+    private double calculateMotionDifference(byte[] frame1, byte[] frame2) {
+        if (frame1.length == 0 || frame2.length == 0) {
+            return 0;
+        }
+
+        long difference = 0;
+        int sampleStep = 8; // Sample every 8th pixel for performance
+        int sampleCount = 0;
+
+        for (int i = 0; i < frame1.length; i += sampleStep) {
+            int val1 = frame1[i] & 0xFF;
+            int val2 = frame2[i] & 0xFF;
+            difference += Math.abs(val2 - val1);
+            sampleCount++;
+        }
+
+        if (sampleCount == 0) {
+            return 0;
+        }
+
+        return (double) difference / sampleCount;
+    }
+
+    private void handleMotionDetected() {
+        long currentTime = System.currentTimeMillis();
+        
+        // Show notification only if cooldown has passed
+        if (currentTime - lastMotionNotificationTime >= MOTION_NOTIFICATION_COOLDOWN_MS) {
+            lastMotionNotificationTime = currentTime;
+            
+            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(currentTime);
+            String message = "Motion detected at " + time;
+            runOnUiThread(() -> {
+                tvNotification.setText(message);
+                Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+            });
+            // persist alert
+            addMotionAlert(message);
+            
+            Log.d(TAG, "Motion detected at " + currentTime);
+        }
+    }
+
+    private void addMotionAlert(String message) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            String json = prefs.getString(ALERTS_KEY, null);
+            JSONArray arr = (json == null) ? new JSONArray() : new JSONArray(json);
+
+            // append, keep size bounded
+            arr.put(message);
+            if (arr.length() > MAX_STORED_ALERTS) {
+                // remove oldest (index 0) until size ok
+                JSONArray newArr = new JSONArray();
+                int start = arr.length() - MAX_STORED_ALERTS;
+                for (int i = start; i < arr.length(); i++) {
+                    newArr.put(arr.optString(i));
+                }
+                arr = newArr;
+            }
+
+            prefs.edit().putString(ALERTS_KEY, arr.toString()).apply();
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to save motion alert", e);
+        }
     }
 
     private void connectToDevice(BluetoothDevice device) {
