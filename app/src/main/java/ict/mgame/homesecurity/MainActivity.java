@@ -766,15 +766,25 @@ public class MainActivity extends AppCompatActivity {
 
     private void switchToRemoteCamera() {
         runOnUiThread(() -> {
-            // Don't show camera switch button - Arduino doesn't have a camera
-            btnSwitchCamera.setVisibility(View.GONE);
+            // Show camera switch button when connected via Bluetooth
+            btnSwitchCamera.setVisibility(View.VISIBLE);
+            updateCameraSwitchButton(false); // Start with Arduino camera
             
-            // Keep using phone camera
-            viewFinder.setVisibility(View.VISIBLE);
-            remoteCameraView.setVisibility(View.GONE);
+            viewFinder.setVisibility(View.GONE);
+            remoteCameraView.setVisibility(View.VISIBLE);
             tvStatus.setText("System Status: Connected ✓");
             tvStatus.setTextColor(0xFF2E7D32); // Green color for connected state
         });
+        
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                cameraProvider.unbindAll();
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to unbind camera", e);
+            }
+        }, ContextCompat.getMainExecutor(this));
     }
 
     private void switchToLocalCamera() {
