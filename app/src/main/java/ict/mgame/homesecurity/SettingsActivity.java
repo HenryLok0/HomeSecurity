@@ -23,6 +23,8 @@ import java.util.Set;
 
 public class SettingsActivity extends AppCompatActivity {
 
+    private static SettingsActivity instance; // Static reference for callbacks
+
     private ListView lvBluetoothDevices;
     private android.widget.LinearLayout layoutNoDevice;
     private TextInputEditText etNewPassword;
@@ -45,6 +47,8 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+        
+        instance = this; // Set static reference
 
         // Initialize Views
         lvBluetoothDevices = findViewById(R.id.lvBluetoothDevices);
@@ -222,5 +226,21 @@ public class SettingsActivity extends AppCompatActivity {
             Toast.makeText(this, "Not connected to Arduino. Showing last saved data.", Toast.LENGTH_LONG).show();
             loadDhtValuesToUI();
         }
+    }
+    
+    // Static method to update UI from MainActivity when DHT data is received
+    public static void notifyDhtDataReceived(float temp, float humidity) {
+        if (instance != null) {
+            instance.runOnUiThread(() -> {
+                instance.tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
+                instance.tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", humidity));
+            });
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        instance = null; // Clear static reference
     }
 }

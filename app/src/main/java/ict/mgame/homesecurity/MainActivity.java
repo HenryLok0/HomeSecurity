@@ -970,6 +970,9 @@ public class MainActivity extends AppCompatActivity {
                                             // persist via SettingsActivity helper
                                             SettingsActivity.saveDhtValues(MainActivity.this, t, h);
                                             
+                                            // Notify SettingsActivity to update UI immediately
+                                            SettingsActivity.notifyDhtDataReceived(t, h);
+                                            
                                             // update status text
                                             runOnUiThread(() -> tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h)));
                                         } catch (Exception e) {
