@@ -312,7 +312,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startCamera() {
-        if (isRemoteCameraActive) return;
+        startCamera(false);
+    }
+
+    private void startCamera(boolean forceStart) {
+        if (isRemoteCameraActive && !forceStart) return;
 
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
 
@@ -801,19 +805,16 @@ public class MainActivity extends AppCompatActivity {
             boolean showingRemote = (remoteCameraView.getVisibility() == View.VISIBLE);
             
             if (showingRemote) {
-                // Switch to phone camera - temporarily disable remote flag to allow camera start
-                boolean wasRemoteActive = isRemoteCameraActive;
-                isRemoteCameraActive = false;
+                // Switch to phone camera
+                runOnUiThread(() -> {
+                    remoteCameraView.setVisibility(View.GONE);
+                    viewFinder.setVisibility(View.VISIBLE);
+                    updateCameraSwitchButton(true);
+                    tvStatus.setText("System Status: Phone Camera");
+                });
                 
-                remoteCameraView.setVisibility(View.GONE);
-                viewFinder.setVisibility(View.VISIBLE);
-                startCamera();
-                
-                // Restore remote flag (Bluetooth is still connected)
-                isRemoteCameraActive = wasRemoteActive;
-                
-                updateCameraSwitchButton(true);
-                tvStatus.setText("System Status: Phone Camera");
+                // Force start camera even though Bluetooth is connected
+                startCamera(true);
             } else {
                 // Switch to Arduino camera
                 ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
@@ -826,10 +827,12 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }, ContextCompat.getMainExecutor(this));
                 
-                viewFinder.setVisibility(View.GONE);
-                remoteCameraView.setVisibility(View.VISIBLE);
-                updateCameraSwitchButton(false);
-                tvStatus.setText("System Status: Arduino Camera");
+                runOnUiThread(() -> {
+                    viewFinder.setVisibility(View.GONE);
+                    remoteCameraView.setVisibility(View.VISIBLE);
+                    updateCameraSwitchButton(false);
+                    tvStatus.setText("System Status: Arduino Camera");
+                });
             }
         }
     }
