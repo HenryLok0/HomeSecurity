@@ -179,6 +179,70 @@
                         android:layout_gravity="end"/>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+            
+            <!-- Alarm Test Section -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Alarm Test (Buzzer)"
+                        android:textStyle="bold"
+                        android:textSize="18sp"
+                        android:textColor="#1A237E"
+                        android:layout_marginBottom="16dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Test the Arduino buzzer and LED alarm"
+                        android:textSize="14sp"
+                        android:textColor="#666"
+                        android:layout_marginBottom="16dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <Button
+                            android:id="@+id/btnStartBuzzer"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Start Buzzer"
+                            android:padding="12dp"
+                            android:layout_marginEnd="8dp"
+                            android:backgroundTint="#D32F2F"
+                            app:cornerRadius="8dp"/>
+
+                        <Button
+                            android:id="@+id/btnStopBuzzer"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Stop Buzzer"
+                            android:padding="12dp"
+                            android:layout_marginStart="8dp"
+                            android:backgroundTint="#388E3C"
+                            app:cornerRadius="8dp"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+            
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

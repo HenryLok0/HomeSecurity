@@ -32,6 +32,9 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvTemperature;
     private TextView tvHumidity;
     private Button btnRefreshDht;
+    // Alarm Test UI
+    private Button btnStartBuzzer;
+    private Button btnStopBuzzer;
 
     private BluetoothAdapter bluetoothAdapter;
     private ArrayList<String> deviceList;
@@ -54,11 +57,19 @@ public class SettingsActivity extends AppCompatActivity {
         tvTemperature = findViewById(R.id.tvTemperature);
         tvHumidity = findViewById(R.id.tvHumidity);
         btnRefreshDht = findViewById(R.id.btnRefreshDht);
+        
+        // Alarm Test Views
+        btnStartBuzzer = findViewById(R.id.btnStartBuzzer);
+        btnStopBuzzer = findViewById(R.id.btnStopBuzzer);
 
         // Load saved DHT values
         loadDhtValuesToUI();
 
         btnRefreshDht.setOnClickListener(v -> loadDhtValuesToUI());
+        
+        // Alarm Test Listeners
+        btnStartBuzzer.setOnClickListener(v -> sendAlarmCommand('a'));
+        btnStopBuzzer.setOnClickListener(v -> sendAlarmCommand('x'));
 
         // Initialize Bluetooth Adapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -183,5 +194,16 @@ public class SettingsActivity extends AppCompatActivity {
             tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
             tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", humidity));
         });
+    }
+    
+    private void sendAlarmCommand(char command) {
+        // Send command to MainActivity via static method
+        boolean sent = MainActivity.sendBluetoothCommand(command);
+        if (sent) {
+            String action = (command == 'a') ? "Start" : "Stop";
+            Toast.makeText(this, action + " buzzer command sent", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Not connected to Arduino", Toast.LENGTH_SHORT).show();
+        }
     }
 }

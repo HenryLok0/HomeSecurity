@@ -53,6 +53,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import org.json.JSONArray;
@@ -127,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
     // Bluetooth variables
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket bluetoothSocket;
-    private ConnectedThread connectedThread;
+    private static ConnectedThread connectedThread; // Changed to static for SettingsActivity access
     private boolean isRemoteCameraActive = false;
     private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"); // Standard SPP UUID
 
@@ -570,7 +571,44 @@ public class MainActivity extends AppCompatActivity {
             // attempt to capture a photo; when saved, the callback will persist the alert with photo URI
             takePhotoForAlert(message);
             Log.d(TAG, "Motion detected at " + currentTime);
+            
+            // Trigger Arduino alarm: send 'a', wait 5s, send 'x'
+            triggerAlarm();
         }
+    }
+
+    private void triggerAlarm() {
+        if (connectedThread != null && isRemoteCameraActive) {
+            // Send alarm ON command
+            connectedThread.sendAlarmOn();
+            
+            // Schedule alarm OFF after 5 seconds
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (connectedThread != null) {
+                    connectedThread.sendAlarmOff();
+                }
+            }, 5000); // 5 seconds delay
+            
+            Log.d(TAG, "Alarm triggered: ON for 5 seconds");
+        }
+    }
+    
+    // Static method for SettingsActivity to send commands
+    public static boolean sendBluetoothCommand(char command) {
+        if (connectedThread != null) {
+            try {
+                if (command == 'a') {
+                    connectedThread.sendAlarmOn();
+                } else if (command == 'x') {
+                    connectedThread.sendAlarmOff();
+                }
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send command from Settings", e);
+                return false;
+            }
+        }
+        return false;
     }
 
     private void takePhotoForAlert(String message) {
@@ -656,9 +694,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void connectToDevice(BluetoothDevice device) {
+        // Show connecting status
+        runOnUiThread(() -> {
+            tvStatus.setText("System Status: Connecting...");
+            tvStatus.setTextColor(0xFFFF9800); // Orange color for connecting
+        });
+        
         new Thread(() -> {
             try {
                 if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    runOnUiThread(() -> {
+                        tvStatus.setText("System Status: Permission Denied");
+                        tvStatus.setTextColor(0xFFD32F2F); // Red
+                    });
                     return;
                 }
                 bluetoothSocket = device.createRfcommSocketToServiceRecord(MY_UUID);
@@ -676,7 +724,11 @@ public class MainActivity extends AppCompatActivity {
 
             } catch (IOException e) {
                 Log.e(TAG, "Connection failed", e);
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Connection failed", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this, "Connection failed", Toast.LENGTH_SHORT).show();
+                    tvStatus.setText("System Status: Connection Failed ✗");
+                    tvStatus.setTextColor(0xFFD32F2F); // Red
+                });
                 try {
                     bluetoothSocket.close();
                 } catch (IOException e2) {
@@ -709,36 +761,51 @@ public class MainActivity extends AppCompatActivity {
 
         viewFinder.setVisibility(View.GONE);
         remoteCameraView.setVisibility(View.VISIBLE);
-        tvStatus.setText("System Status: Remote Camera");
+        tvStatus.setText("System Status: Connected ✓");
+        tvStatus.setTextColor(0xFF2E7D32); // Green color for connected state
     }
 
     private void switchToLocalCamera() {
         remoteCameraView.setVisibility(View.GONE);
         viewFinder.setVisibility(View.VISIBLE);
         tvStatus.setText("System Status: Online");
+        tvStatus.setTextColor(0xFF000000); // Black (default)
         startCamera();
     }
 
     private class ConnectedThread extends Thread {
         private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
         private boolean isRunning = true;
+        private long lastDhtRequestTime = 0;
+        private static final long DHT_REQUEST_INTERVAL = 5000; // Request every 5 seconds
 
         public ConnectedThread(BluetoothSocket socket) {
             InputStream tmpIn = null;
+            OutputStream tmpOut = null;
             try {
                 tmpIn = socket.getInputStream();
+                tmpOut = socket.getOutputStream();
             } catch (IOException e) {
-                Log.e(TAG, "Error creating input stream", e);
+                Log.e(TAG, "Error creating streams", e);
             }
             mmInStream = tmpIn;
+            mmOutStream = tmpOut;
         }
 
         public void run() {
             Log.d(TAG, "BEGIN mConnectedThread");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] readTmp = new byte[4096];
+            
+            // Note: DHT request removed - this Arduino only handles alarm (buzzer/LED)
+            // If you have a separate DHT11 Arduino, uncomment the line below:
+            // requestDhtData();
+            
             while (isRunning) {
                 try {
+                    // Removed periodic DHT requests for alarm-only Arduino
+                    
                     int available = mmInStream.available();
                     if (available > 0) {
                         int toRead = Math.min(available, readTmp.length);
@@ -802,25 +869,34 @@ public class MainActivity extends AppCompatActivity {
                                         processedUpTo += parts[i].getBytes().length + 1; // approximate
                                         continue;
                                     }
-                                    // Try to parse DHT patterns like: DHT:23.4,56.0 or 23.4,56.0
-                                    String candidate = line;
-                                    if (candidate.toUpperCase().startsWith("DHT:")) candidate = candidate.substring(4).trim();
-                                    // remove any non number/comma/dot characters at ends
-                                    candidate = candidate.replaceAll("[^0-9.,-]", "");
-                                    if (candidate.contains(",")) {
-                                        String[] kv = candidate.split(",");
-                                        if (kv.length >= 2) {
-                                            try {
-                                                float t = Float.parseFloat(kv[0]);
-                                                float h = Float.parseFloat(kv[1]);
-                                                Log.d(TAG, "Parsed DHT -> T=" + t + " H=" + h);
-                                                // persist via SettingsActivity helper
-                                                SettingsActivity.saveDhtValues(MainActivity.this, t, h);
-                                                // optional: update status text
-                                                runOnUiThread(() -> tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h)));
-                                            } catch (NumberFormatException nfe) {
-                                                // ignore parse error
-                                            }
+                                    // Parse Arduino DHT format: "TEMP=23.4 C, HUM=56.7 %"
+                                    if (line.toUpperCase().contains("TEMP=") && line.toUpperCase().contains("HUM=")) {
+                                        try {
+                                            // Extract temperature
+                                            int tempStart = line.toUpperCase().indexOf("TEMP=") + 5;
+                                            int tempEnd = line.indexOf(" ", tempStart);
+                                            if (tempEnd == -1) tempEnd = line.indexOf(",", tempStart);
+                                            if (tempEnd == -1) tempEnd = line.length();
+                                            String tempStr = line.substring(tempStart, tempEnd).trim();
+                                            
+                                            // Extract humidity
+                                            int humStart = line.toUpperCase().indexOf("HUM=") + 4;
+                                            int humEnd = line.indexOf(" ", humStart);
+                                            if (humEnd == -1) humEnd = line.indexOf("%", humStart);
+                                            if (humEnd == -1) humEnd = line.length();
+                                            String humStr = line.substring(humStart, humEnd).trim();
+                                            
+                                            float t = Float.parseFloat(tempStr);
+                                            float h = Float.parseFloat(humStr);
+                                            Log.d(TAG, "Parsed DHT -> T=" + t + "°C H=" + h + "%");
+                                            
+                                            // persist via SettingsActivity helper
+                                            SettingsActivity.saveDhtValues(MainActivity.this, t, h);
+                                            
+                                            // update status text
+                                            runOnUiThread(() -> tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h)));
+                                        } catch (Exception e) {
+                                            Log.w(TAG, "Failed to parse DHT line: " + line, e);
                                         }
                                     }
                                     processedUpTo += parts[i].getBytes().length + 1;
@@ -841,6 +917,44 @@ public class MainActivity extends AppCompatActivity {
                 } catch (IOException | InterruptedException e) {
                     Log.e(TAG, "disconnected", e);
                     break;
+                }
+            }
+        }
+
+        private void requestDhtData() {
+            if (mmOutStream != null) {
+                try {
+                    mmOutStream.write('t');
+                    mmOutStream.flush();
+                    Log.d(TAG, "Sent 't' command to Arduino");
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to send DHT request", e);
+                }
+            }
+        }
+
+        // Send alarm ON command to Arduino
+        public void sendAlarmOn() {
+            if (mmOutStream != null) {
+                try {
+                    mmOutStream.write('a');
+                    mmOutStream.flush();
+                    Log.d(TAG, "Sent 'a' (ALARM ON) to Arduino");
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to send alarm ON", e);
+                }
+            }
+        }
+
+        // Send alarm OFF command to Arduino
+        public void sendAlarmOff() {
+            if (mmOutStream != null) {
+                try {
+                    mmOutStream.write('x');
+                    mmOutStream.flush();
+                    Log.d(TAG, "Sent 'x' (ALARM OFF) to Arduino");
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to send alarm OFF", e);
                 }
             }
         }
