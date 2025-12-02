@@ -1,161 +1,90 @@
 #include <SoftwareSerial.h>
 #include <ctype.h>   // for tolower()
-#include <DHT.h>     // 需要安装 Adafruit 的 DHT 库
+#include <DHT.h>     // DHT11 library
 
 // ----------------------
 // Bluetooth wiring (UNO1)
 // BT TXD -> D2 (UNO RX)
 // BT RXD -> D3 (UNO TX, via resistor divider)
 // ----------------------
-const int BT_RX_PIN = 2;  // Arduino 接收蓝牙数据 (连 BT TXD)
-const int BT_TX_PIN = 3;  // Arduino 发送数据给蓝牙 (连 BT RXD)
+const int BT_RX_PIN = 2;  // 接 HC-05 TXD
+const int BT_TX_PIN = 3;  // 接 HC-05 RXD
 
 SoftwareSerial BT(BT_RX_PIN, BT_TX_PIN);  // RX, TX
 
 // ----------------------
+// DHT11 Sensor (UNO1 - Optional)
+// DHT11 DATA -> D5
+// ----------------------
+#define DHTPIN 5           // DHT11 data pin
+#define DHTTYPE DHT11      // DHT11 sensor
+DHT dht(DHTPIN, DHTTYPE);
+unsigned long lastDhtReadTime = 0;
+const unsigned long DHT_READ_INTERVAL = 2000;  // DHT11 needs ~2 seconds between reads
+
+// ----------------------
 // Alarm devices on UNO1
 // ----------------------
-// HW-512 有源蜂鸣器:
-//   + -> D6
-//   - -> GND
-const int buzzerPin = 6;
+const int buzzerPin = 6;  // HW-512 + -> D6
+const int redPin   = 9;   // HW-477 R -> 电阻 -> D9
+const int greenPin = 10;  // HW-477 G -> 电阻 -> D10
 
-// HW-477 双色 LED (共阴极):
-//   - -> GND
-//   R -> 电阻 -> D9
-//   G -> 电阻 -> D10
-const int redPin   = 9;
-const int greenPin = 10;
-
-// ----------------------
-// DHT11 (HW-507) 温湿度传感器
-//   VCC -> 5V
-//   GND -> GND
-//   OUT -> D7
-// ----------------------
-#define DHTPIN   7
-#define DHTTYPE  DHT11
-
-DHT dht(DHTPIN, DHTTYPE);
-
-// DHT11 读数缓存，避免频繁访问（DHT11 最少 1 秒一次）
-unsigned long lastDhtReadTime = 0;
-const unsigned long DHT_INTERVAL = 2000; // 2 秒
-float lastTemp = NAN;
-float lastHum  = NAN;
-
-// 报警状态
 bool alarmOn = false;
-
-// 用 millis() 做闪烁
 unsigned long lastToggleTime = 0;
-const unsigned long alarmInterval = 300; // 闪烁间隔 (ms)
-bool alarmOutputState = false;           // 当前输出是 HIGH 还是 LOW
+const unsigned long alarmInterval = 300;
+bool alarmOutputState = false;
 
 // ----------------------
-// 安全读取 DHT11（必要时才重新采样）
+// 处理本地蓝牙指令
+// a   = alarm ON
+// x   = alarm OFF
+// t   = send DHT11 data
+// ?   = show help
 // ----------------------
-bool readDHTIfNeeded() {
-  unsigned long now = millis();
+void handleLocalBtCommand(char c) {
+  char cmd = tolower(c);
 
-  // 如果上次读在 2 秒以内，直接用缓存
-  if ((now - lastDhtReadTime < DHT_INTERVAL) &&
-      !isnan(lastTemp) && !isnan(lastHum)) {
-    return true;
-  }
-
-  float h = dht.readHumidity();
-  float t = dht.readTemperature(); // 摄氏温度
-
-  if (isnan(h) || isnan(t)) {
-    // 读取失败
-    return false;
-  }
-
-  lastHum = h;
-  lastTemp = t;
-  lastDhtReadTime = now;
-  return true;
-}
-
-// ----------------------
-// 处理蓝牙收到的一条指令
-// ----------------------
-void handleBtCommand(char c) {
-  c = tolower(c);  // 支持大小写
-
-  if (c == 'a') {
-    // 开启警报
+  if (cmd == 'a') {
     alarmOn = true;
     BT.println(F("ALARM ON"));
-    Serial.println(F("ALARM ON"));
-
-  } else if (c == 'x') {
-    // 关闭警报
+  } else if (cmd == 'x') {
     alarmOn = false;
     BT.println(F("ALARM OFF"));
-    Serial.println(F("ALARM OFF"));
 
-    // 立刻关闭蜂鸣器和灯
     alarmOutputState = false;
     digitalWrite(buzzerPin, LOW);
     digitalWrite(redPin, LOW);
     digitalWrite(greenPin, LOW);
-
-  } else if (c == 't') {
-    // 读取 DHT11 温湿度并回传
-    if (!readDHTIfNeeded()) {
-      Serial.println(F("DHT11 read failed"));
-      BT.println(F("ERROR: Failed to read from DHT11 sensor."));
-      return;
-    }
-
-    // 打印到串口监视器
-    Serial.print(F("DHT11 -> T="));
-    Serial.print(lastTemp);
-    Serial.print(F(" *C, H="));
-    Serial.print(lastHum);
-    Serial.println(F(" %"));
-
-    // 通过蓝牙回传
-    BT.print(F("TEMP="));
-    BT.print(lastTemp, 1);
-    BT.print(F(" C, HUM="));
-    BT.print(lastHum, 1);
-    BT.println(F(" %"));
-
-  } else if (c == '?') {
-    // 帮助菜单
+  } else if (cmd == 't') {
+    // Request DHT11 data
+    requestAndSendDHT11();
+  } else if (cmd == '?') {
     BT.println(F("Commands:"));
-    BT.println(F("  a - alarm ON (buzzer + HW-477 R/G blink)"));
+    BT.println(F("  a - alarm ON (buzzer + LED blink)"));
     BT.println(F("  x - alarm OFF"));
-    BT.println(F("  t - read DHT11 temperature & humidity"));
+    BT.println(F("  t - send DHT11 temperature & humidity"));
     BT.println(F("  ? - show this help"));
-
   } else {
-    // 未知命令
-    BT.print(F("Unknown cmd: "));
-    BT.println(c);
-    BT.println(F("Use 'a', 'x', 't' or '?'"));
+    // Forward other chars to UNO2 if needed
+    Serial.write(c);
   }
 }
 
 void setup() {
-  // PC 调试串口
-  Serial.begin(9600);
+  // 串口 0：连接 UNO2
+  Serial.begin(115200);   // 必须和 UNO2 的 Serial.begin 一致
 
   // 蓝牙串口
-  BT.begin(9600);   // HC-05/06 默认 9600
+  BT.begin(9600);         // HC-05 默认 9600
 
-  // IO 模式
+  // DHT11 初始化（可选）
+  dht.begin();
+
+  // 报警用 IO
   pinMode(buzzerPin, OUTPUT);
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
 
-  // DHT11 初始化
-  dht.begin();
-
-  // 初始全部关闭
   digitalWrite(buzzerPin, LOW);
   digitalWrite(redPin, LOW);
   digitalWrite(greenPin, LOW);
@@ -163,35 +92,45 @@ void setup() {
   alarmOn = false;
   alarmOutputState = false;
   lastToggleTime = millis();
-  lastDhtReadTime = 0;
 
-  Serial.println(F("UNO1: Bluetooth alarm + DHT11 ready."));
-  BT.println(F("UNO1: HomeSecurity alarm + DHT11 ready."));
-  BT.println(F("Send 'a' (alarm on), 'x' (alarm off), 't' (temperature&humidity), '?' (help)."));
+  BT.println(F("UNO1: Bridge ready."));
+  BT.println(F("  a/x/? are handled by UNO1 (alarm)."));
+  BT.println(F("  t = request DHT11 temperature/humidity"));
+  BT.println(F("  other chars will be forwarded to UNO2 (camera)."));
 }
 
 void loop() {
-  // 1) 蓝牙接收指令
-  if (BT.available()) {
-    char c = BT.read();
-    if (c != '\r' && c != '\n') {  // 忽略回车/换行
-      handleBtCommand(c);
-    }
-  }
-
-  // 可选：电脑串口监视器也能发同样指令测试
+  // 1) 从 UNO2 (Serial) 收数据 -> 批量转发到蓝牙
+  //    使用缓冲区避免数据丢失
   if (Serial.available()) {
-    char c = Serial.read();
-    if (c != '\r' && c != '\n') {
-      handleBtCommand(c);
+    uint8_t buffer[64]; // 64 字节缓冲区
+    int count = 0;
+    
+    // 读取多个字节到缓冲区
+    while (Serial.available() && count < 64) {
+      buffer[count++] = Serial.read();
+    }
+    
+    // 批量写入蓝牙
+    if (count > 0) {
+      BT.write(buffer, count);
     }
   }
 
-  // 2) 根据 alarmOn 状态控制蜂鸣器 + 灯
+  // 2) 从蓝牙收到数据 -> 既要处理本地命令，又可能转发给 UNO2
+  while (BT.available()) {
+    char c = BT.read();
+    if (c == '\r' || c == '\n') {
+      // 忽略回车换行
+    } else {
+      handleLocalBtCommand(c);
+    }
+  }
+
+  // 3) 报警闪烁逻辑
   unsigned long now = millis();
 
   if (alarmOn) {
-    // 报警模式：蜂鸣器 + 红灯 + 绿灯 一起闪烁
     if (now - lastToggleTime >= alarmInterval) {
       lastToggleTime = now;
       alarmOutputState = !alarmOutputState;
@@ -201,9 +140,42 @@ void loop() {
       digitalWrite(greenPin,  alarmOutputState ? HIGH : LOW);
     }
   } else {
-    // 非报警模式：保持关闭（双保险）
     digitalWrite(buzzerPin, LOW);
     digitalWrite(redPin, LOW);
     digitalWrite(greenPin, LOW);
   }
+}
+
+// ============================================================================
+// DHT11 Helper Functions
+// ============================================================================
+void requestAndSendDHT11() {
+  // Check if enough time has passed (DHT11 requires ~2 seconds between reads)
+  unsigned long now = millis();
+  if (now - lastDhtReadTime < DHT_READ_INTERVAL) {
+    BT.println(F("DHT: Wait a moment..."));
+    return;
+  }
+  
+  lastDhtReadTime = now;
+  
+  // Read humidity and temperature
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();  // Celsius
+  
+  // Check if any reading failed
+  if (isnan(humidity) || isnan(temperature)) {
+    BT.println(F("DHT ERROR: Failed to read sensor"));
+    return;
+  }
+  
+  // Send formatted data to Android via Bluetooth
+  // Format: "TEMP=23.5 C, HUM=65.2 %"
+  BT.print(F("TEMP="));
+  BT.print(temperature, 1);  // 1 decimal place
+  BT.print(F(" C, HUM="));
+  BT.print(humidity, 1);     // 1 decimal place
+  BT.println(F(" %"));
+  
+  BT.flush();
 }
