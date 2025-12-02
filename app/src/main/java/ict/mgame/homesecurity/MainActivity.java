@@ -583,19 +583,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void triggerAlarm() {
+        // Send alarm ON command to Arduino (if connected via Bluetooth)
         if (connectedThread != null && isRemoteCameraActive) {
-            // Send alarm ON command
             connectedThread.sendAlarmOn();
             
-            // Schedule alarm OFF after 5 seconds
+            // Schedule alarm OFF after 3 seconds
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 if (connectedThread != null) {
                     connectedThread.sendAlarmOff();
                 }
-            }, 5000); // 5 seconds delay
+            }, 3000); // 3 seconds delay
             
-            Log.d(TAG, "Alarm triggered: ON for 5 seconds");
+            Log.d(TAG, "Alarm triggered: Buzzer ON for 3 seconds");
         }
+        
+        // Show notification to user on phone
+        runOnUiThread(() -> {
+            Toast.makeText(MainActivity.this, "⚠️ Motion Detected! Buzzer activated for 3 seconds", Toast.LENGTH_LONG).show();
+        });
     }
     
     // Static method for SettingsActivity to send commands
@@ -754,6 +759,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void switchToRemoteCamera() {
+        runOnUiThread(() -> {
+            // Show camera switch button when connected via Bluetooth
+            btnSwitchCamera.setVisibility(View.VISIBLE);
+            updateCameraSwitchButton(false); // Start with Arduino camera
+            
+            viewFinder.setVisibility(View.GONE);
+            remoteCameraView.setVisibility(View.VISIBLE);
+            tvStatus.setText("System Status: Connected ✓");
+            tvStatus.setTextColor(0xFF2E7D32); // Green color for connected state
+        });
+        
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
         cameraProviderFuture.addListener(() -> {
             try {
@@ -763,25 +779,18 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "Failed to unbind camera", e);
             }
         }, ContextCompat.getMainExecutor(this));
-
-        viewFinder.setVisibility(View.GONE);
-        remoteCameraView.setVisibility(View.VISIBLE);
-        tvStatus.setText("System Status: Connected ✓");
-        tvStatus.setTextColor(0xFF2E7D32); // Green color for connected state
-        
-        // Show camera switch button when connected via Bluetooth
-        btnSwitchCamera.setVisibility(View.VISIBLE);
-        updateCameraSwitchButton(false); // Start with Arduino camera
     }
 
     private void switchToLocalCamera() {
-        remoteCameraView.setVisibility(View.GONE);
-        viewFinder.setVisibility(View.VISIBLE);
-        tvStatus.setText("System Status: Online");
-        tvStatus.setTextColor(0xFF000000); // Black (default)
-        
-        // Hide camera switch button when using local camera only
-        btnSwitchCamera.setVisibility(View.GONE);
+        runOnUiThread(() -> {
+            remoteCameraView.setVisibility(View.GONE);
+            viewFinder.setVisibility(View.VISIBLE);
+            tvStatus.setText("System Status: Online");
+            tvStatus.setTextColor(0xFF000000); // Black (default)
+            
+            // Hide camera switch button when using local camera only
+            btnSwitchCamera.setVisibility(View.GONE);
+        });
         
         startCamera();
     }
