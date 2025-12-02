@@ -768,8 +768,9 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             // Show camera switch button when connected via Bluetooth
             btnSwitchCamera.setVisibility(View.VISIBLE);
-            updateCameraSwitchButton(false); // Start with Arduino camera
+            updateCameraSwitchButton(false); // Start with Arduino camera (OV7670)
             
+            // Initially show Arduino camera
             viewFinder.setVisibility(View.GONE);
             remoteCameraView.setVisibility(View.VISIBLE);
             tvStatus.setText("System Status: Connected ✓");
