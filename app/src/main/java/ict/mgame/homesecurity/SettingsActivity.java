@@ -65,7 +65,7 @@ public class SettingsActivity extends AppCompatActivity {
         // Load saved DHT values
         loadDhtValuesToUI();
 
-        btnRefreshDht.setOnClickListener(v -> loadDhtValuesToUI());
+        btnRefreshDht.setOnClickListener(v -> requestDhtData());
         
         // Alarm Test Listeners
         btnStartBuzzer.setOnClickListener(v -> sendAlarmCommand('a'));
@@ -204,6 +204,23 @@ public class SettingsActivity extends AppCompatActivity {
             Toast.makeText(this, action + " buzzer command sent", Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, "Not connected to Arduino", Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void requestDhtData() {
+        // Request DHT11 data from Arduino
+        boolean sent = MainActivity.sendBluetoothCommand('t');
+        if (sent) {
+            Toast.makeText(this, "Requesting temperature & humidity data...", Toast.LENGTH_SHORT).show();
+            // Data will be updated automatically when Arduino responds
+            // The response is parsed in MainActivity's ConnectedThread and saved via saveDhtValues()
+            // UI will be updated after a short delay
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                loadDhtValuesToUI();
+            }, 1000); // Wait 1 second for Arduino to respond
+        } else {
+            Toast.makeText(this, "Not connected to Arduino. Showing last saved data.", Toast.LENGTH_LONG).show();
+            loadDhtValuesToUI();
         }
     }
 }

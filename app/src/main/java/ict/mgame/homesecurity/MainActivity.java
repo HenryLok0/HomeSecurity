@@ -615,6 +615,8 @@ public class MainActivity extends AppCompatActivity {
                     connectedThread.sendAlarmOn();
                 } else if (command == 'x') {
                     connectedThread.sendAlarmOff();
+                } else if (command == 't') {
+                    connectedThread.requestDhtData();
                 }
                 return true;
             } catch (Exception e) {
@@ -996,7 +998,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        private void requestDhtData() {
+        public void requestDhtData() {
             if (mmOutStream != null) {
                 try {
                     mmOutStream.write('t');
