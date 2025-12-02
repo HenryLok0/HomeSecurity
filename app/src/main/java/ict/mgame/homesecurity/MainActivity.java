@@ -99,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnNotifications;
     private Button btnLogout;
     private MaterialButton btnMotionSensor;
+    private MaterialButton btnSwitchCamera;
     private TextView tvStatus;
     private TextView tvNotification;
     private PreviewView viewFinder;
@@ -162,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
         btnNotifications = findViewById(R.id.btnNotifications);
         btnLogout = findViewById(R.id.btnLogout);
         btnMotionSensor = findViewById(R.id.btnMotionSensor);
+        btnSwitchCamera = findViewById(R.id.btnSwitchCamera);
         tvStatus = findViewById(R.id.tvStatus);
         tvNotification = findViewById(R.id.tvNotification);
         viewFinder = findViewById(R.id.viewFinder);
@@ -210,6 +212,9 @@ public class MainActivity extends AppCompatActivity {
         // Motion Sensor Button Listener
         btnMotionSensor.setOnClickListener(v -> toggleMotionSensor());
         updateMotionSensorButton();
+
+        // Camera Switch Button Listener
+        btnSwitchCamera.setOnClickListener(v -> toggleCameraView());
 
         cameraExecutor = Executors.newSingleThreadExecutor();
     }
@@ -763,6 +768,10 @@ public class MainActivity extends AppCompatActivity {
         remoteCameraView.setVisibility(View.VISIBLE);
         tvStatus.setText("System Status: Connected ✓");
         tvStatus.setTextColor(0xFF2E7D32); // Green color for connected state
+        
+        // Show camera switch button when connected via Bluetooth
+        btnSwitchCamera.setVisibility(View.VISIBLE);
+        updateCameraSwitchButton(false); // Start with Arduino camera
     }
 
     private void switchToLocalCamera() {
@@ -770,7 +779,54 @@ public class MainActivity extends AppCompatActivity {
         viewFinder.setVisibility(View.VISIBLE);
         tvStatus.setText("System Status: Online");
         tvStatus.setTextColor(0xFF000000); // Black (default)
+        
+        // Hide camera switch button when using local camera only
+        btnSwitchCamera.setVisibility(View.GONE);
+        
         startCamera();
+    }
+
+    private void toggleCameraView() {
+        if (isRemoteCameraActive) {
+            // Toggle between phone camera and Arduino camera
+            boolean showingRemote = (remoteCameraView.getVisibility() == View.VISIBLE);
+            
+            if (showingRemote) {
+                // Switch to phone camera
+                remoteCameraView.setVisibility(View.GONE);
+                viewFinder.setVisibility(View.VISIBLE);
+                startCamera();
+                updateCameraSwitchButton(true);
+                tvStatus.setText("System Status: Phone Camera");
+            } else {
+                // Switch to Arduino camera
+                ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
+                cameraProviderFuture.addListener(() -> {
+                    try {
+                        ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                        cameraProvider.unbindAll();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to unbind camera", e);
+                    }
+                }, ContextCompat.getMainExecutor(this));
+                
+                viewFinder.setVisibility(View.GONE);
+                remoteCameraView.setVisibility(View.VISIBLE);
+                updateCameraSwitchButton(false);
+                tvStatus.setText("System Status: Arduino Camera");
+            }
+        }
+    }
+
+    private void updateCameraSwitchButton(boolean isPhoneCamera) {
+        if (btnSwitchCamera == null) return;
+        if (isPhoneCamera) {
+            btnSwitchCamera.setText("Phone");
+            btnSwitchCamera.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF1976D2)); // Blue
+        } else {
+            btnSwitchCamera.setText("Arduino");
+            btnSwitchCamera.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFF6F00)); // Orange
+        }
     }
 
     private class ConnectedThread extends Thread {

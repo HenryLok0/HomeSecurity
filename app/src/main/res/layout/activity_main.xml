@@ -130,6 +130,23 @@
                             app:icon="@android:drawable/ic_lock_idle_alarm"
                             app:iconGravity="textStart"
                             app:iconTint="#FFFFFF" />
+
+                        <!-- Camera Switch Button (Top Left) -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSwitchCamera"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="top|start"
+                            android:layout_margin="12dp"
+                            android:text="Phone"
+                            android:textAllCaps="false"
+                            android:textColor="#FFFFFF"
+                            android:backgroundTint="#66000000"
+                            android:visibility="gone"
+                            app:icon="@android:drawable/ic_menu_camera"
+                            app:iconGravity="textStart"
+                            app:iconTint="#FFFFFF" />
                     </FrameLayout>
 
                     <LinearLayout
