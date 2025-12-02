@@ -801,10 +801,17 @@ public class MainActivity extends AppCompatActivity {
             boolean showingRemote = (remoteCameraView.getVisibility() == View.VISIBLE);
             
             if (showingRemote) {
-                // Switch to phone camera
+                // Switch to phone camera - temporarily disable remote flag to allow camera start
+                boolean wasRemoteActive = isRemoteCameraActive;
+                isRemoteCameraActive = false;
+                
                 remoteCameraView.setVisibility(View.GONE);
                 viewFinder.setVisibility(View.VISIBLE);
                 startCamera();
+                
+                // Restore remote flag (Bluetooth is still connected)
+                isRemoteCameraActive = wasRemoteActive;
+                
                 updateCameraSwitchButton(true);
                 tvStatus.setText("System Status: Phone Camera");
             } else {
