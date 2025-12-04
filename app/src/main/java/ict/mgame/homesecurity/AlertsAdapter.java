@@ -16,10 +16,18 @@ import java.util.List;
 public class AlertsAdapter extends RecyclerView.Adapter<AlertsAdapter.VH> {
     private final List<AlertsActivity.AlertItem> items;
     private final View.OnClickListener clickListener;
+    private final Runnable selectionCallback;
+    private boolean selectionMode = false;
+    private final java.util.Set<Integer> selected = new java.util.HashSet<>();
 
     public AlertsAdapter(List<AlertsActivity.AlertItem> items, View.OnClickListener clickListener) {
+        this(items, clickListener, null);
+    }
+
+    public AlertsAdapter(List<AlertsActivity.AlertItem> items, View.OnClickListener clickListener, Runnable selectionCallback) {
         this.items = items;
         this.clickListener = clickListener;
+        this.selectionCallback = selectionCallback;
     }
 
     @NonNull
@@ -47,7 +55,24 @@ public class AlertsAdapter extends RecyclerView.Adapter<AlertsAdapter.VH> {
         } else {
             holder.ivThumb.setImageResource(android.R.drawable.ic_menu_gallery);
         }
-        holder.itemView.setOnClickListener(clickListener);
+        // Handle click depending on selection mode
+        holder.itemView.setOnClickListener(v -> {
+            if (selectionMode) {
+                toggleSelection(position);
+                notifyItemChanged(position);
+                if (selectionCallback != null) selectionCallback.run();
+            } else {
+                clickListener.onClick(v);
+            }
+        });
+
+        // Update checkbox visibility/state
+        if (selectionMode) {
+            holder.cbSelect.setVisibility(android.view.View.VISIBLE);
+            holder.cbSelect.setChecked(selected.contains(position));
+        } else {
+            holder.cbSelect.setVisibility(android.view.View.GONE);
+        }
     }
 
     @Override
@@ -59,12 +84,37 @@ public class AlertsAdapter extends RecyclerView.Adapter<AlertsAdapter.VH> {
         ImageView ivThumb;
         TextView tvMessage;
         TextView tvTime;
+        android.widget.CheckBox cbSelect;
 
         VH(@NonNull View itemView) {
             super(itemView);
             ivThumb = itemView.findViewById(R.id.ivAlertThumb);
             tvMessage = itemView.findViewById(R.id.tvAlertMessage);
             tvTime = itemView.findViewById(R.id.tvAlertTime);
+            cbSelect = itemView.findViewById(R.id.cbSelect);
         }
+    }
+
+    public void setSelectionMode(boolean enabled) {
+        if (!enabled) selected.clear();
+        this.selectionMode = enabled;
+        notifyDataSetChanged();
+    }
+
+    public boolean isSelectionMode() {
+        return selectionMode;
+    }
+
+    public void toggleSelection(int pos) {
+        if (selected.contains(pos)) selected.remove(pos); else selected.add(pos);
+    }
+
+    public java.util.Set<Integer> getSelectedPositions() {
+        return new java.util.HashSet<>(selected);
+    }
+
+    public void clearSelection() {
+        selected.clear();
+        notifyDataSetChanged();
     }
 }
