@@ -18,6 +18,8 @@ import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -95,9 +97,9 @@ public class MainActivity extends AppCompatActivity {
     private Button btnSettings;
     private Button btnTakePhoto;
     private Button btnRecordVideo;
-    private Button btnHistory;
-    private Button btnNotifications;
-    private Button btnLogout;
+    private View btnHistory;
+    private View btnNotifications;
+    private MaterialButton btnLogout;
     private MaterialButton btnMotionSensor;
     private MaterialButton btnSwitchCamera;
     private TextView tvStatus;
@@ -168,6 +170,12 @@ public class MainActivity extends AppCompatActivity {
         tvNotification = findViewById(R.id.tvNotification);
         viewFinder = findViewById(R.id.viewFinder);
         remoteCameraView = findViewById(R.id.remoteCameraView);
+
+        // Check for null views
+        if (tvStatus == null || tvNotification == null || viewFinder == null) {
+            Toast.makeText(this, "Error: Failed to initialize views. Please restart the app.", Toast.LENGTH_LONG).show();
+            return;
+        }
 
         tvStatus.setText("System Status: Online");
 
@@ -394,8 +402,8 @@ public class MainActivity extends AppCompatActivity {
             if (allPermissionsGranted()) {
                 startCamera();
             } else {
-                Toast.makeText(this, "Permissions not granted by the user.", Toast.LENGTH_SHORT).show();
-                finish();
+                Toast.makeText(this, "Camera permissions are required for full functionality. Some features may be limited.", Toast.LENGTH_LONG).show();
+                // Don't finish() - allow app to continue with limited functionality
             }
         }
     }
@@ -403,7 +411,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        cameraExecutor.shutdown();
+        if (cameraExecutor != null) {
+            cameraExecutor.shutdown();
+        }
     }
 
     private void showNotificationHistory() {
@@ -496,20 +506,64 @@ public class MainActivity extends AppCompatActivity {
         if (!isMotionSensorEnabled) {
             previousFrame = null;
         }
+        
+        // Animate the button
+        Animation scaleAnim = AnimationUtils.loadAnimation(this, R.anim.scale_in);
+        btnMotionSensor.startAnimation(scaleAnim);
+        
         updateMotionSensorButton();
-        Toast.makeText(this, "Motion sensor " + (isMotionSensorEnabled ? "enabled" : "disabled"), Toast.LENGTH_SHORT).show();
+        
+        String message = "Motion sensor " + (isMotionSensorEnabled ? "enabled" : "disabled");
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        
+        // Update status indicator
+        updateStatusIndicator();
     }
 
     private void updateMotionSensorButton() {
         if (btnMotionSensor == null) return;
         if (isMotionSensorEnabled) {
             btnMotionSensor.setText("Sensor ON");
-            btnMotionSensor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF2E7D32)); // Green
-            btnMotionSensor.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF)); // White
+            btnMotionSensor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.motion_active)
+            ));
+            btnMotionSensor.setIconTint(android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.white)
+            ));
+            
+            // Add pulse animation when active
+            Animation pulse = AnimationUtils.loadAnimation(this, R.anim.pulse);
+            btnMotionSensor.startAnimation(pulse);
         } else {
             btnMotionSensor.setText("Sensor OFF");
-            btnMotionSensor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0x66000000)); // Semi-transparent black
-            btnMotionSensor.setIconTint(android.content.res.ColorStateList.valueOf(0xFFFFFFFF)); // White
+            btnMotionSensor.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.motion_inactive)
+            ));
+            btnMotionSensor.setIconTint(android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.white)
+            ));
+            
+            // Clear animation when inactive
+            btnMotionSensor.clearAnimation();
+        }
+    }
+    
+    private void updateStatusIndicator() {
+        View statusIndicator = findViewById(R.id.statusIndicator);
+        TextView tvStatusSubtext = findViewById(R.id.tvStatusSubtext);
+        
+        if (statusIndicator != null && tvStatusSubtext != null) {
+            if (isMotionSensorEnabled) {
+                statusIndicator.setBackground(ContextCompat.getDrawable(this, R.drawable.ic_status_active));
+                tvStatusSubtext.setText("Motion detection active");
+                
+                // Pulse animation for status indicator
+                Animation pulse = AnimationUtils.loadAnimation(this, R.anim.pulse);
+                statusIndicator.startAnimation(pulse);
+            } else {
+                statusIndicator.clearAnimation();
+                tvStatusSubtext.setText("All systems operational");
+            }
         }
     }
 
@@ -576,6 +630,27 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 tvNotification.setText(message);
                 Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                
+                // Animate notification card
+                View cvNotification = findViewById(R.id.cvNotification);
+                if (cvNotification != null) {
+                    Animation slideIn = AnimationUtils.loadAnimation(this, R.anim.slide_in_bottom);
+                    cvNotification.startAnimation(slideIn);
+                    
+                    // Change card color to warning
+                    if (cvNotification instanceof com.google.android.material.card.MaterialCardView) {
+                        com.google.android.material.card.MaterialCardView cardView = 
+                            (com.google.android.material.card.MaterialCardView) cvNotification;
+                        cardView.setCardBackgroundColor(ContextCompat.getColor(this, R.color.warning));
+                        cardView.setStrokeColor(ContextCompat.getColor(this, R.color.danger));
+                        
+                        // Reset color after 5 seconds
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            cardView.setCardBackgroundColor(0xFFE8F5E9);
+                            cardView.setStrokeColor(ContextCompat.getColor(this, R.color.success));
+                        }, 5000);
+                    }
+                }
             });
             // attempt to capture a photo; when saved, the callback will persist the alert with photo URI
             takePhotoForAlert(message);
@@ -842,13 +917,35 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateCameraSwitchButton(boolean isPhoneCamera) {
         if (btnSwitchCamera == null) return;
-        if (isPhoneCamera) {
-            btnSwitchCamera.setText("Phone");
-            btnSwitchCamera.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF1976D2)); // Blue
-        } else {
-            btnSwitchCamera.setText("Arduino");
-            btnSwitchCamera.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFFF6F00)); // Orange
-        }
+        
+        // Animate button transition
+        Animation fadeOut = AnimationUtils.loadAnimation(this, R.anim.fade_out);
+        Animation fadeIn = AnimationUtils.loadAnimation(this, R.anim.fade_in);
+        
+        btnSwitchCamera.startAnimation(fadeOut);
+        fadeOut.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {}
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                if (isPhoneCamera) {
+                    btnSwitchCamera.setText("Phone");
+                    btnSwitchCamera.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(MainActivity.this, R.color.camera_phone)
+                    ));
+                } else {
+                    btnSwitchCamera.setText("Arduino");
+                    btnSwitchCamera.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(MainActivity.this, R.color.camera_arduino)
+                    ));
+                }
+                btnSwitchCamera.startAnimation(fadeIn);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {}
+        });
     }
 
     private class ConnectedThread extends Thread {

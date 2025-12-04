@@ -1,5 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Base Colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    
+    <!-- Primary Brand Colors - Deep Blue Security Theme -->
+    <color name="primary">#1565C0</color>
+    <color name="primary_dark">#0D47A1</color>
+    <color name="primary_light">#42A5F5</color>
+    <color name="primary_variant">#1976D2</color>
+    
+    <!-- Secondary Colors - Accent Green for Safe/Active States -->
+    <color name="secondary">#00C853</color>
+    <color name="secondary_dark">#00A343</color>
+    <color name="secondary_light">#69F0AE</color>
+    
+    <!-- Accent Colors -->
+    <color name="accent">#FF6F00</color>
+    <color name="accent_light">#FFB74D</color>
+    
+    <!-- Status Colors -->
+    <color name="success">#00C853</color>
+    <color name="warning">#FFA726</color>
+    <color name="danger">#E53935</color>
+    <color name="info">#29B6F6</color>
+    
+    <!-- Background Colors -->
+    <color name="background">#F5F7FA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_variant">#F8F9FA</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#9E9E9E</color>
+    <color name="text_disabled">#BDBDBD</color>
+    
+    <!-- Password Strength Colors -->
+    <color name="password_weak">#E53935</color>
+    <color name="password_medium">#FFA726</color>
+    <color name="password_strong">#00C853</color>
+    <color name="password_very_strong">#00897B</color>
+    
+    <!-- Gradient Colors -->
+    <color name="gradient_start">#1565C0</color>
+    <color name="gradient_end">#42A5F5</color>
+    
+    <!-- Overlay Colors -->
+    <color name="overlay_dark">#80000000</color>
+    <color name="overlay_light">#20000000</color>
+    
+    <!-- Card Colors -->
+    <color name="card_background">#FFFFFF</color>
+    <color name="card_stroke">#E0E0E0</color>
+    
+    <!-- Motion Detection -->
+    <color name="motion_active">#00C853</color>
+    <color name="motion_inactive">#757575</color>
+    
+    <!-- Camera States -->
+    <color name="camera_phone">#1976D2</color>
+    <color name="camera_arduino">#FF6F00</color>
 </resources>
