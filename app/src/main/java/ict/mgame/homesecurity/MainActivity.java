@@ -120,8 +120,8 @@ public class MainActivity extends AppCompatActivity {
     private byte[] previousFrame;
     private static final double MOTION_THRESHOLD = 15.0; // Adjusted for slow motion detection
     // Alerts storage
-    private static final String PREFS_NAME = "HomeSecurityPrefs";
-    private static final String ALERTS_KEY = "motion_alerts"; // stored as JSON array string
+    public static final String PREFS_NAME = "HomeSecurityPrefs";
+    public static final String ALERTS_KEY = "motion_alerts"; // stored as JSON array string
     private static final int MAX_STORED_ALERTS = 200;
     // motion detection smoothing
     private static final int MOTION_WINDOW_SAMPLES = 3; // average over 3 frames
@@ -417,83 +417,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showNotificationHistory() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String json = prefs.getString(ALERTS_KEY, null);
-        if (json == null) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Motion Events");
-            builder.setItems(new String[]{"No motion alerts"}, null);
-            builder.setPositiveButton("Close", null);
-            builder.show();
-            return;
-        }
-
+        // Open the full AlertsActivity with a list view (migrated from dialog-based UI)
         try {
-            JSONArray arr = new JSONArray(json);
-            int n = arr.length();
-            if (n == 0) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle("Motion Events");
-                builder.setItems(new String[]{"No motion alerts"}, null);
-                builder.setPositiveButton("Close", null);
-                builder.show();
-                return;
-            }
-
-            String[] items = new String[n];
-            final String[] uris = new String[n];
-            for (int i = 0; i < n; i++) {
-                // newest first
-                org.json.JSONObject obj = arr.getJSONObject(n - 1 - i);
-                items[i] = obj.optString("message", "(no message)");
-                String u = obj.optString("uri", null);
-                uris[i] = (u == null || u.equals("null")) ? null : u;
-            }
-
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Motion Events");
-            builder.setItems(items, (dialog, which) -> {
-                // show image if available
-                String uriStr = uris[which];
-                if (uriStr == null) {
-                    new AlertDialog.Builder(MainActivity.this)
-                            .setTitle(items[which])
-                            .setMessage("No photo available for this alert")
-                            .setPositiveButton("Close", null)
-                            .show();
-                } else {
-                    // load and show image in dialog
-                    try {
-                        android.net.Uri uri = android.net.Uri.parse(uriStr);
-                        InputStream is = getContentResolver().openInputStream(uri);
-                        Bitmap bmp = BitmapFactory.decodeStream(is);
-                        is.close();
-                        ImageView iv = new ImageView(MainActivity.this);
-                        iv.setImageBitmap(bmp);
-                        new AlertDialog.Builder(MainActivity.this)
-                                .setTitle(items[which])
-                                .setView(iv)
-                                .setPositiveButton("Close", null)
-                                .show();
-                    } catch (Exception e) {
-                        Log.e(TAG, "Failed to load alert image", e);
-                        new AlertDialog.Builder(MainActivity.this)
-                                .setTitle(items[which])
-                                .setMessage("Failed to load image")
-                                .setPositiveButton("Close", null)
-                                .show();
-                    }
-                }
-            });
-            builder.setPositiveButton("Close", null);
-            builder.show();
-        } catch (JSONException e) {
-            Log.e(TAG, "Failed to parse alerts JSON", e);
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Motion Events");
-            builder.setItems(new String[]{"No motion alerts"}, null);
-            builder.setPositiveButton("Close", null);
-            builder.show();
+            Intent intent = new Intent(this, AlertsActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to open AlertsActivity", e);
         }
     }
     
