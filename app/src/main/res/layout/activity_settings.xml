@@ -137,14 +137,15 @@
                                 android:layout_height="wrap_content"
                                 android:text="Temperature"
                                 android:textSize="14sp"
-                                android:textColor="#666"/>
+                                android:textColor="@color/text_secondary"/>
                             <TextView
                                 android:id="@+id/tvTemperature"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="-- °C"
-                                android:textSize="16sp"
+                                android:textSize="18sp"
                                 android:textStyle="bold"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginTop="4dp"/>
                         </LinearLayout>
 
@@ -158,14 +159,15 @@
                                 android:layout_height="wrap_content"
                                 android:text="Humidity"
                                 android:textSize="14sp"
-                                android:textColor="#666"/>
+                                android:textColor="@color/text_secondary"/>
                             <TextView
                                 android:id="@+id/tvHumidity"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="-- %"
-                                android:textSize="16sp"
+                                android:textSize="18sp"
                                 android:textStyle="bold"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginTop="4dp"/>
                         </LinearLayout>
                     </LinearLayout>
@@ -209,7 +211,7 @@
                         android:layout_height="wrap_content"
                         android:text="Test the Arduino buzzer and LED alarm"
                         android:textSize="14sp"
-                        android:textColor="#666"
+                        android:textColor="@color/text_secondary"
                         android:layout_marginBottom="16dp"/>
 
                     <LinearLayout
@@ -270,13 +272,17 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="16dp"
                         android:hint="New Password"
+                        android:textColorHint="@color/text_secondary"
+                        app:hintTextColor="@color/primary"
+                        app:boxStrokeColor="@color/primary"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etNewPassword"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:inputType="textPassword"/>
+                            android:inputType="textPassword"
+                            android:textColor="@color/text_primary"/>
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <com.google.android.material.textfield.TextInputLayout
@@ -284,13 +290,17 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="24dp"
                         android:hint="Confirm New Password"
+                        android:textColorHint="@color/text_secondary"
+                        app:hintTextColor="@color/primary"
+                        app:boxStrokeColor="@color/primary"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etConfirmPassword"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:inputType="textPassword"/>
+                            android:inputType="textPassword"
+                            android:textColor="@color/text_primary"/>
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <Button

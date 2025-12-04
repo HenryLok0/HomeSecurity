@@ -79,7 +79,7 @@ public class SettingsActivity extends AppCompatActivity {
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         deviceList = new ArrayList<>();
         bluetoothDevices = new ArrayList<>();
-        deviceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, deviceList);
+        deviceAdapter = new ArrayAdapter<>(this, R.layout.item_bluetooth_device, android.R.id.text1, deviceList);
         lvBluetoothDevices.setAdapter(deviceAdapter);
 
         // Load Bluetooth Devices
