@@ -876,13 +876,19 @@ public class MainActivity extends AppCompatActivity {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] readTmp = new byte[4096];
             
-            // Note: DHT request removed - this Arduino only handles alarm (buzzer/LED)
-            // If you have a separate DHT11 Arduino, uncomment the line below:
-            // requestDhtData();
+            // Request initial DHT11 reading after connection established
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                requestDhtData();
+            }, 1000); // Wait 1 second after connection before first request
             
             while (isRunning) {
                 try {
-                    // Removed periodic DHT requests for alarm-only Arduino
+                    // Periodic DHT11 data request (every 5 seconds)
+                    long now = System.currentTimeMillis();
+                    if (now - lastDhtRequestTime >= DHT_REQUEST_INTERVAL) {
+                        requestDhtData();
+                        lastDhtRequestTime = now;
+                    }
                     
                     int available = mmInStream.available();
                     if (available > 0) {
