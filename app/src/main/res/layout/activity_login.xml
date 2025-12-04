@@ -117,7 +117,9 @@
                     android:layout_height="wrap_content"
                     android:inputType="textPersonName"
                     android:textSize="16sp"
-                    android:padding="16dp"/>
+                    android:padding="16dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"/>
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Password Input -->
@@ -145,7 +147,9 @@
                     android:layout_height="wrap_content"
                     android:inputType="textPassword"
                     android:textSize="16sp"
-                    android:padding="16dp"/>
+                    android:padding="16dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"/>
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Password Strength Indicator (Hidden by default) -->
