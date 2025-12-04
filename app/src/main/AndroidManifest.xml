@@ -41,6 +41,14 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
+            android:name=".AlertsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".AlertDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".AlertsActivity" />
+        <activity
             android:name=".MediaViewerActivity"
             android:exported="false"
             android:parentActivityName=".HistoryActivity" />
