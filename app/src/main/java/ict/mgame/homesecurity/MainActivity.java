@@ -97,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnSettings;
     private Button btnTakePhoto;
     private Button btnRecordVideo;
-    private View btnHistory;
+    private View btnGallery;
     private View btnNotifications;
     private MaterialButton btnLogout;
     private MaterialButton btnMotionSensor;
@@ -161,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
         btnSettings = findViewById(R.id.btnSettings);
         btnTakePhoto = findViewById(R.id.btnTakePhoto);
         btnRecordVideo = findViewById(R.id.btnRecordVideo);
-        btnHistory = findViewById(R.id.btnHistory);
+        btnGallery = findViewById(R.id.btnGallery);
         btnNotifications = findViewById(R.id.btnNotifications);
         btnLogout = findViewById(R.id.btnLogout);
         btnMotionSensor = findViewById(R.id.btnMotionSensor);
@@ -198,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
 
         btnRecordVideo.setOnClickListener(v -> captureVideo());
 
-        btnHistory.setOnClickListener(v -> {
+        btnGallery.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, HistoryActivity.class);
             startActivity(intent);
         });
