@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- External storage paths for Pictures -->
+    <external-path
+        name="external_pictures"
+        path="Pictures/HomeSecurity-Image" />
+    
+    <!-- External storage paths for Movies -->
+    <external-path
+        name="external_movies"
+        path="Movies/HomeSecurity-Video" />
+    
+    <!-- Root external storage -->
+    <external-path
+        name="external_files"
+        path="." />
+</paths>

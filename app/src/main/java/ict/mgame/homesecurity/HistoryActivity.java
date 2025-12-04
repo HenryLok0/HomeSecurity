@@ -149,19 +149,57 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
 
     private void shareSelectedFiles() {
         Set<File> selected = adapter.getSelectedFiles();
-        ArrayList<Uri> uris = new ArrayList<>();
-        for (File file : selected) {
-            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
-            uris.add(uri);
-        }
-
-        Intent shareIntent = new Intent();
-        shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
-        shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
-        shareIntent.setType("*/*");
-        startActivity(Intent.createChooser(shareIntent, "Share files to.."));
         
-        adapter.clearSelection();
+        if (selected.isEmpty()) {
+            Toast.makeText(this, "No files selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        try {
+            ArrayList<Uri> uris = new ArrayList<>();
+            for (File file : selected) {
+                if (file.exists()) {
+                    Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
+                    uris.add(uri);
+                }
+            }
+            
+            if (uris.isEmpty()) {
+                Toast.makeText(this, "No valid files to share", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Intent shareIntent = new Intent();
+            if (uris.size() == 1) {
+                shareIntent.setAction(Intent.ACTION_SEND);
+                shareIntent.putExtra(Intent.EXTRA_STREAM, uris.get(0));
+            } else {
+                shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
+                shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+            }
+            
+            // Determine MIME type based on files
+            String mimeType = "*/*";
+            if (!selected.isEmpty()) {
+                File firstFile = selected.iterator().next();
+                if (firstFile.getName().toLowerCase().endsWith(".mp4")) {
+                    mimeType = "video/*";
+                } else if (firstFile.getName().toLowerCase().endsWith(".jpg") || 
+                           firstFile.getName().toLowerCase().endsWith(".jpeg")) {
+                    mimeType = "image/*";
+                }
+            }
+            
+            shareIntent.setType(mimeType);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            startActivity(Intent.createChooser(shareIntent, "Share files via"));
+            adapter.clearSelection();
+            
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to share files: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        }
     }
 
     @Override
