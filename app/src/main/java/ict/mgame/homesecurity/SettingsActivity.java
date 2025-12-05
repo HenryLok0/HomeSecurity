@@ -408,8 +408,16 @@ public class SettingsActivity extends AppCompatActivity {
             switchSoundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 prefs.edit().putBoolean(KEY_SOUND_ENABLED, isChecked).apply();
                 if (isChecked) {
-                    startSoundPolling();
-                    Toast.makeText(this, "Sound monitoring enabled", Toast.LENGTH_SHORT).show();
+                    // Require active Bluetooth connection before polling
+                    boolean canPoll = MainActivity.sendBluetoothCommand('\u0000'); // no-op check for thread
+                    if (canPoll) {
+                        startSoundPolling();
+                        Toast.makeText(this, "Sound monitoring enabled", Toast.LENGTH_SHORT).show();
+                    } else {
+                        switchSoundMonitor.setChecked(false);
+                        prefs.edit().putBoolean(KEY_SOUND_ENABLED, false).apply();
+                        Toast.makeText(this, "Not connected to Arduino. Enable after Bluetooth connected.", Toast.LENGTH_LONG).show();
+                    }
                 } else {
                     stopSoundPolling();
                     Toast.makeText(this, "Sound monitoring disabled", Toast.LENGTH_SHORT).show();
@@ -530,5 +538,13 @@ public class SettingsActivity extends AppCompatActivity {
                 recreate();
             }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (instance == this) {
+            instance = null;
+        }
     }
 }

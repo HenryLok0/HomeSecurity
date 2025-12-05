@@ -429,6 +429,7 @@ public class MainActivity extends AppCompatActivity {
         if (cameraExecutor != null) {
             cameraExecutor.shutdown();
         }
+        disconnectBluetooth();
     }
 
     private void showNotificationHistory() {
@@ -908,7 +909,7 @@ public class MainActivity extends AppCompatActivity {
     private class ConnectedThread extends Thread {
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
-        private boolean isRunning = true;
+        private volatile boolean isRunning = true;
         private long lastDhtRequestTime = 0;
         private static final long DHT_REQUEST_INTERVAL = 5000; // Request every 5 seconds
 
@@ -928,12 +929,10 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             Log.d(TAG, "BEGIN mConnectedThread");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] readTmp = new byte[4096];
+            byte[] readTmp = new byte[1024];
             
             // Request initial DHT11 reading after connection established
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                requestDhtData();
-            }, 1000); // Wait 1 second after connection before first request
+            new Handler(Looper.getMainLooper()).postDelayed(this::requestDhtData, 1000); 
             
             while (isRunning) {
                 try {
@@ -944,161 +943,215 @@ public class MainActivity extends AppCompatActivity {
                         lastDhtRequestTime = now;
                     }
                     
+                    if (mmInStream == null) break;
+
                     int available = mmInStream.available();
                     if (available > 0) {
                         int toRead = Math.min(available, readTmp.length);
                         int read = mmInStream.read(readTmp, 0, toRead);
                         if (read > 0) {
                             buffer.write(readTmp, 0, read);
-                            byte[] data = buffer.toByteArray();
-
-                            // Try to extract JPEG frames if present (SOI 0xFFD8 .. EOI 0xFFD9)
-                            int start = -1;
-                            int end = -1;
-                            for (int i = 0; i < data.length - 1; i++) {
-                                if ((data[i] & 0xFF) == 0xFF && (data[i+1] & 0xFF) == 0xD8) {
-                                    start = i;
-                                    break;
-                                }
-                            }
-                            if (start >= 0) {
-                                for (int j = start + 2; j < data.length - 1; j++) {
-                                    if ((data[j] & 0xFF) == 0xFF && (data[j+1] & 0xFF) == 0xD9) {
-                                        end = j+1;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (start >= 0 && end > start) {
-                                try {
-                                    byte[] jpeg = new byte[end - start + 1];
-                                    System.arraycopy(data, start, jpeg, 0, jpeg.length);
-                                    final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
-                                    if (bmp != null) {
-                                        runOnUiThread(() -> remoteCameraView.setImageBitmap(bmp));
-                                    }
-                                } catch (Exception e) {
-                                    Log.w(TAG, "Failed to decode JPEG chunk", e);
-                                }
-                                // remove processed bytes from buffer
-                                byte[] remaining = new byte[data.length - (end + 1)];
-                                System.arraycopy(data, end + 1, remaining, 0, remaining.length);
-                                buffer.reset();
-                                buffer.write(remaining);
-                                data = buffer.toByteArray();
-                            }
-
-                            // Process textual lines (DHT messages) separated by newline
-                            String text = null;
-                            try {
-                                text = new String(data, "UTF-8");
-                            } catch (Exception e) {
-                                text = null;
-                            }
-                            if (text != null && text.contains("\n")) {
-                                String[] parts = text.split("\\r?\\n");
-                                int processedUpTo = 0;
-                                for (int i = 0; i < parts.length; i++) {
-                                    String line = parts[i].trim();
-                                    // If this is the last part and original text did not end with newline, keep it in buffer
-                                    boolean isLast = (i == parts.length - 1) && !text.endsWith("\n") && !text.endsWith("\r\n");
-                                    if (line.length() == 0) {
-                                        processedUpTo += parts[i].getBytes().length + 1; // approximate
-                                        continue;
-                                    }
-                                    // Parse Arduino DHT format: "TEMP=23.4 C, HUM=56.7 %"
-                                    if (line.toUpperCase().contains("TEMP=") && line.toUpperCase().contains("HUM=")) {
-                                        try {
-                                            // Extract temperature
-                                            int tempStart = line.toUpperCase().indexOf("TEMP=") + 5;
-                                            int tempEnd = line.indexOf(" ", tempStart);
-                                            if (tempEnd == -1) tempEnd = line.indexOf(",", tempStart);
-                                            if (tempEnd == -1) tempEnd = line.length();
-                                            String tempStr = line.substring(tempStart, tempEnd).trim();
-                                            
-                                            // Extract humidity
-                                            int humStart = line.toUpperCase().indexOf("HUM=") + 4;
-                                            int humEnd = line.indexOf(" ", humStart);
-                                            if (humEnd == -1) humEnd = line.indexOf("%", humStart);
-                                            if (humEnd == -1) humEnd = line.length();
-                                            String humStr = line.substring(humStart, humEnd).trim();
-                                            
-                                            float t = Float.parseFloat(tempStr);
-                                            float h = Float.parseFloat(humStr);
-                                            Log.d(TAG, "Parsed DHT -> T=" + t + "°C H=" + h + "%");
-                                            
-                                            // persist via SettingsActivity helper
-                                            SettingsActivity.saveDhtValues(MainActivity.this, t, h);
-                                            
-                                            // Notify SettingsActivity to update UI immediately
-                                            SettingsActivity.notifyDhtDataReceived(t, h);
-                                            
-                                            // update status text
-                                            runOnUiThread(() -> tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h)));
-                                        } catch (Exception e) {
-                                            Log.w(TAG, "Failed to parse DHT line: " + line, e);
-                                        }
-                                    } else if (line.toUpperCase().contains("SOUND_RAW=") && line.toUpperCase().contains("SOUND_PERCENT=")) {
-                                        try {
-                                            // Parse SOUND_RAW
-                                            int rawStart = line.toUpperCase().indexOf("SOUND_RAW=") + 10;
-                                            int rawEnd = line.indexOf(",", rawStart);
-                                            if (rawEnd == -1) rawEnd = line.length();
-                                            String rawStr = line.substring(rawStart, rawEnd).trim();
-
-                                            // Parse SOUND_PERCENT
-                                            int percentStart = line.toUpperCase().indexOf("SOUND_PERCENT=") + 14;
-                                            int percentEnd = line.indexOf("%", percentStart);
-                                            if (percentEnd == -1) percentEnd = line.length();
-                                            String percentStr = line.substring(percentStart, percentEnd).trim();
-
-                                            int raw = Integer.parseInt(rawStr);
-                                            int percent = Integer.parseInt(percentStr);
-                                            Log.d(TAG, "Parsed SOUND -> RAW=" + raw + " PERCENT=" + percent + "%");
-
-                                            // persist and notify Settings UI
-                                            SettingsActivity.saveSoundValues(MainActivity.this, raw, percent);
-                                            SettingsActivity.notifySoundDataReceived(raw, percent);
-
-                                            // Threshold check
-                                            boolean monitorEnabled = SettingsActivity.isSoundMonitoringEnabled(MainActivity.this);
-                                            int threshold = SettingsActivity.getSoundThresholdPercent(MainActivity.this);
-                                            if (monitorEnabled && percent >= threshold) {
-                                                long currentTime = System.currentTimeMillis();
-                                                if (currentTime - lastMotionNotificationTime >= MOTION_NOTIFICATION_COOLDOWN_MS) {
-                                                    lastMotionNotificationTime = currentTime;
-                                                    runOnUiThread(() -> {
-                                                        if (tvNotification != null) {
-                                                            tvNotification.setText("Sound level exceeded: " + percent + "% (>= " + threshold + "%)");
-                                                        }
-                                                    });
-                                                    // Trigger alarm (will honor buzzer enabled setting)
-                                                    triggerAlarm();
-                                                }
-                                            }
-                                        } catch (Exception e) {
-                                            Log.w(TAG, "Failed to parse SOUND line: " + line, e);
-                                        }
-                                    }
-                                    processedUpTo += parts[i].getBytes().length + 1;
-                                    if (isLast) break;
-                                }
-                                // remove processed text bytes from buffer
-                                if (processedUpTo > 0) {
-                                    byte[] remaining = new byte[Math.max(0, data.length - processedUpTo)];
-                                    System.arraycopy(data, processedUpTo, remaining, 0, remaining.length);
-                                    buffer.reset();
-                                    buffer.write(remaining);
-                                }
-                            }
+                            processBuffer(buffer);
                         }
                     } else {
-                        Thread.sleep(50);
+                        try {
+                            Thread.sleep(50);
+                        } catch (InterruptedException e) {
+                            break;
+                        }
                     }
-                } catch (IOException | InterruptedException e) {
+                } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     break;
+                }
+            }
+            cancel();
+        }
+
+        private void processBuffer(ByteArrayOutputStream buffer) {
+            byte[] data = buffer.toByteArray();
+            if (data.length == 0) return;
+
+            // 1. Find JPEG Start
+            int start = -1;
+            for (int i = 0; i < data.length - 1; i++) {
+                if ((data[i] & 0xFF) == 0xFF && (data[i+1] & 0xFF) == 0xD8) {
+                    start = i;
+                    break;
+                }
+            }
+
+            // 2. Process text before JPEG (or all text if no JPEG)
+            int textEnd = (start != -1) ? start : data.length;
+            if (textEnd > 0) {
+                byte[] textBytes = new byte[textEnd];
+                System.arraycopy(data, 0, textBytes, 0, textEnd);
+                
+                String textChunk = new String(textBytes);
+                int lastNewline = textChunk.lastIndexOf('\n');
+                
+                if (lastNewline >= 0) {
+                    String toProcess = textChunk.substring(0, lastNewline);
+                    String[] lines = toProcess.split("\\r?\\n");
+                    for (String line : lines) {
+                        processTextLine(line.trim());
+                    }
+                }
+            }
+
+            // 3. Process JPEG
+            if (start != -1) {
+                // Check for JPEG End
+                int end = -1;
+                for (int j = start + 2; j < data.length - 1; j++) {
+                    if ((data[j] & 0xFF) == 0xFF && (data[j+1] & 0xFF) == 0xD9) {
+                        end = j + 1;
+                        break;
+                    }
+                }
+
+                if (end != -1) {
+                    // Found complete JPEG
+                    try {
+                        byte[] jpeg = new byte[end - start + 1];
+                        System.arraycopy(data, start, jpeg, 0, jpeg.length);
+                        final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                        if (bmp != null) {
+                            runOnUiThread(() -> remoteCameraView.setImageBitmap(bmp));
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to decode JPEG chunk", e);
+                    }
+                    
+                    // Remove everything up to end of JPEG
+                    int remainingLen = data.length - (end + 1);
+                    byte[] remaining = new byte[remainingLen];
+                    System.arraycopy(data, end + 1, remaining, 0, remainingLen);
+                    
+                    buffer.reset();
+                    try {
+                        buffer.write(remaining);
+                    } catch (IOException e) {}
+                    
+                    // Recurse
+                    processBuffer(buffer);
+                } else {
+                    // Partial JPEG. Keep from 'start' onwards.
+                    int remainingLen = data.length - start;
+                    byte[] remaining = new byte[remainingLen];
+                    System.arraycopy(data, start, remaining, 0, remainingLen);
+                    
+                    buffer.reset();
+                    try {
+                        buffer.write(remaining);
+                    } catch (IOException e) {}
+                }
+            } else {
+                // No JPEG start found. Keep remaining text after last newline.
+                String textChunk = new String(data);
+                int lastNewline = textChunk.lastIndexOf('\n');
+                if (lastNewline >= 0) {
+                     int remainingLen = data.length - (lastNewline + 1);
+                     if (remainingLen > 0) {
+                         byte[] remaining = new byte[remainingLen];
+                         System.arraycopy(data, lastNewline + 1, remaining, 0, remainingLen);
+                         buffer.reset();
+                         try {
+                             buffer.write(remaining);
+                         } catch (IOException e) {}
+                     } else {
+                         buffer.reset();
+                     }
+                }
+            }
+            
+            // Safety limit
+            if (buffer.size() > 500000) { // 500KB
+                Log.w(TAG, "Buffer too large, clearing");
+                buffer.reset();
+            }
+        }
+
+        private void processTextLine(String line) {
+            if (line.isEmpty()) return;
+            
+            if (line.toUpperCase().contains("TEMP=") && line.toUpperCase().contains("HUM=")) {
+                try {
+                    int tempStart = line.toUpperCase().indexOf("TEMP=") + 5;
+                    int tempEnd = line.indexOf(" ", tempStart);
+                    if (tempEnd == -1) tempEnd = line.indexOf(",", tempStart);
+                    if (tempEnd == -1) tempEnd = line.length();
+                    String tempStr = line.substring(tempStart, tempEnd).trim();
+                    
+                    int humStart = line.toUpperCase().indexOf("HUM=") + 4;
+                    int humEnd = line.indexOf(" ", humStart);
+                    if (humEnd == -1) humEnd = line.indexOf("%", humStart);
+                    if (humEnd == -1) humEnd = line.length();
+                    String humStr = line.substring(humStart, humEnd).trim();
+                    
+                    float t = Float.parseFloat(tempStr);
+                    float h = Float.parseFloat(humStr);
+                    
+                    SettingsActivity.saveDhtValues(MainActivity.this, t, h);
+                    SettingsActivity.notifyDhtDataReceived(t, h);
+                    
+                    runOnUiThread(() -> {
+                        if (tvStatus != null) {
+                            tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h));
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to parse DHT line: " + line, e);
+                }
+            } else if (line.toUpperCase().contains("SOUND_RAW=") && line.toUpperCase().contains("SOUND_PERCENT=")) {
+                try {
+                    int rawStart = line.toUpperCase().indexOf("SOUND_RAW=") + 10;
+                    int rawEnd = line.indexOf(",", rawStart);
+                    if (rawEnd == -1) rawEnd = line.length();
+                    String rawStr = line.substring(rawStart, rawEnd).trim();
+
+                    int percentStart = line.toUpperCase().indexOf("SOUND_PERCENT=") + 14;
+                    int percentEnd = line.indexOf("%", percentStart);
+                    if (percentEnd == -1) percentEnd = line.length();
+                    String percentStr = line.substring(percentStart, percentEnd).trim();
+
+                    int raw = Integer.parseInt(rawStr);
+                    int percent = Integer.parseInt(percentStr);
+
+                    SettingsActivity.saveSoundValues(MainActivity.this, raw, percent);
+                    SettingsActivity.notifySoundDataReceived(raw, percent);
+
+                    boolean monitorEnabled = SettingsActivity.isSoundMonitoringEnabled(MainActivity.this);
+                    int threshold = SettingsActivity.getSoundThresholdPercent(MainActivity.this);
+                    if (monitorEnabled && percent >= threshold) {
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastMotionNotificationTime >= MOTION_NOTIFICATION_COOLDOWN_MS) {
+                            lastMotionNotificationTime = currentTime;
+                            runOnUiThread(() -> {
+                                if (tvNotification != null) {
+                                    tvNotification.setText("Sound level exceeded: " + percent + "% (>= " + threshold + "%)");
+                                }
+                            });
+                            triggerAlarm();
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to parse SOUND line: " + line, e);
+                }
+            } else if (line.toUpperCase().contains("LIGHT_RAW=") && line.toUpperCase().contains("LIGHT_PERCENT=")) {
+                // Log light sensor data (UI not implemented yet)
+                Log.d(TAG, "Received Light Data: " + line);
+            } else {
+                // Handle generic messages (e.g., "SYSTEM OFF", "ALARM ON")
+                // Filter out short/empty lines or known prefixes to avoid noise
+                if (line.length() > 3 && !line.startsWith("TEMP=") && !line.startsWith("SOUND_RAW=")) {
+                    Log.i(TAG, "Arduino Message: " + line);
+                    runOnUiThread(() -> {
+                        // Show important messages to user
+                        if (line.contains("SYSTEM") || line.contains("ALARM") || line.contains("ERROR")) {
+                            Toast.makeText(MainActivity.this, "Arduino: " + line, Toast.LENGTH_SHORT).show();
+                        }
+                    });
                 }
             }
         }
