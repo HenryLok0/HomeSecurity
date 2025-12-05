@@ -1139,8 +1139,25 @@ public class MainActivity extends AppCompatActivity {
                     Log.w(TAG, "Failed to parse SOUND line: " + line, e);
                 }
             } else if (line.toUpperCase().contains("LIGHT_RAW=") && line.toUpperCase().contains("LIGHT_PERCENT=")) {
-                // Log light sensor data (UI not implemented yet)
-                Log.d(TAG, "Received Light Data: " + line);
+                try {
+                    int rawStart = line.toUpperCase().indexOf("LIGHT_RAW=") + 10;
+                    int rawEnd = line.indexOf(",", rawStart);
+                    if (rawEnd == -1) rawEnd = line.length();
+                    String rawStr = line.substring(rawStart, rawEnd).trim();
+
+                    int percentStart = line.toUpperCase().indexOf("LIGHT_PERCENT=") + 14;
+                    int percentEnd = line.indexOf("%", percentStart);
+                    if (percentEnd == -1) percentEnd = line.length();
+                    String percentStr = line.substring(percentStart, percentEnd).trim();
+
+                    int raw = Integer.parseInt(rawStr);
+                    int percent = Integer.parseInt(percentStr);
+
+                    SettingsActivity.saveLightValues(MainActivity.this, raw, percent);
+                    SettingsActivity.notifyLightDataReceived(raw, percent);
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to parse LIGHT line: " + line, e);
+                }
             } else {
                 // Handle generic messages (e.g., "SYSTEM OFF", "ALARM ON")
                 // Filter out short/empty lines or known prefixes to avoid noise

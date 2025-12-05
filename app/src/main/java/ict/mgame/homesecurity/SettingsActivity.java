@@ -46,6 +46,10 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvSoundPercent;
     private TextView tvSoundThresholdLabel;
     private android.widget.SeekBar seekSoundThreshold;
+    // Light Sensor UI
+    private TextView tvLightRaw;
+    private TextView tvLightPercent;
+    private Button btnRefreshLight;
     // Alarm Test UI
     private Button btnStartBuzzer;
     private Button btnStopBuzzer;
@@ -94,6 +98,11 @@ public class SettingsActivity extends AppCompatActivity {
         tvSoundThresholdLabel = findViewById(R.id.tvSoundThresholdLabel);
         seekSoundThreshold = findViewById(R.id.seekSoundThreshold);
         
+        // Light Sensor Views
+        tvLightRaw = findViewById(R.id.tvLightRaw);
+        tvLightPercent = findViewById(R.id.tvLightPercent);
+        btnRefreshLight = findViewById(R.id.btnRefreshLight);
+        
         // Alarm Test Views
         btnStartBuzzer = findViewById(R.id.btnStartBuzzer);
         btnStopBuzzer = findViewById(R.id.btnStopBuzzer);
@@ -115,8 +124,11 @@ public class SettingsActivity extends AppCompatActivity {
         loadDhtValuesToUI();
         // Load saved Sound values
         loadSoundValuesToUI();
+        // Load saved Light values
+        loadLightValuesToUI();
 
         btnRefreshDht.setOnClickListener(v -> requestDhtData());
+        btnRefreshLight.setOnClickListener(v -> requestLightData());
         // Setup Sound Sensor controls
         setupSoundSensorControls();
         
@@ -220,6 +232,9 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String KEY_SOUND_THRESHOLD = "sound_threshold_percent";
     private static final String KEY_SOUND_RAW = "sound_raw";
     private static final String KEY_SOUND_PERCENT = "sound_percent";
+    // Light sensor keys
+    private static final String KEY_LIGHT_RAW = "light_raw";
+    private static final String KEY_LIGHT_PERCENT = "light_percent";
 
     private void loadDhtValuesToUI() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -280,6 +295,20 @@ public class SettingsActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, "Not connected to Arduino. Showing last saved data.", Toast.LENGTH_LONG).show();
             loadDhtValuesToUI();
+        }
+    }
+
+    private void requestLightData() {
+        // Request Light data from Arduino
+        boolean sent = MainActivity.sendBluetoothCommand('l');
+        if (sent) {
+            Toast.makeText(this, "Requesting light sensor data...", Toast.LENGTH_SHORT).show();
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                loadLightValuesToUI();
+            }, 1000);
+        } else {
+            Toast.makeText(this, "Not connected to Arduino. Showing last saved data.", Toast.LENGTH_LONG).show();
+            loadLightValuesToUI();
         }
     }
     
@@ -472,6 +501,33 @@ public class SettingsActivity extends AppCompatActivity {
         return prefs.getInt(KEY_SOUND_THRESHOLD, 50);
     }
 
+    // ---------- Light Sensor helpers ----------
+    private void loadLightValuesToUI() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int raw = prefs.getInt(KEY_LIGHT_RAW, -1);
+        int percent = prefs.getInt(KEY_LIGHT_PERCENT, -1);
+
+        if (tvLightRaw != null) tvLightRaw.setText(raw >= 0 ? String.valueOf(raw) : "--");
+        if (tvLightPercent != null) tvLightPercent.setText(percent >= 0 ? (percent + " %") : "-- %");
+    }
+
+    public static void saveLightValues(Context ctx, int raw, int percent) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit()
+            .putInt(KEY_LIGHT_RAW, raw)
+            .putInt(KEY_LIGHT_PERCENT, percent)
+            .apply();
+    }
+
+    public static void notifyLightDataReceived(int raw, int percent) {
+        if (instance != null) {
+            instance.runOnUiThread(() -> {
+                if (instance.tvLightRaw != null) instance.tvLightRaw.setText(String.valueOf(raw));
+                if (instance.tvLightPercent != null) instance.tvLightPercent.setText(percent + " %");
+            });
+        }
+    }
+
     // Static method to check if buzzer alarm is enabled
     public static boolean isBuzzerAlarmEnabled(Context ctx) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -540,11 +596,4 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (instance == this) {
-            instance = null;
-        }
-    }
 }
