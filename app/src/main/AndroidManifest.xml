@@ -56,6 +56,10 @@
             android:name=".MediaViewerActivity"
             android:exported="false"
             android:parentActivityName=".HistoryActivity" />
+        <activity
+            android:name=".HomeDataActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
         
         <!-- Background Detection Service -->
         <service

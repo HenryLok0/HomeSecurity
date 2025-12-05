@@ -49,13 +49,8 @@ public class BackgroundDetectionService extends Service {
         
         isServiceRunning = true;
         
-        // Keep MainActivity alive by starting it if not running
-        Intent mainIntent = new Intent(this, MainActivity.class);
-        mainIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        mainIntent.putExtra("background_mode", true);
-        
-        // The service will keep MainActivity alive in the background
-        // MainActivity will continue to handle motion detection
+        // The service will keep the process alive in the background
+        // MainActivity will continue to handle motion detection if it is not destroyed
         
         return START_STICKY; // Service will restart if killed
     }
