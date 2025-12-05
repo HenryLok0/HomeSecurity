@@ -1,0 +1,7 @@
+# Arduino code files - treat as Arduino language
+*.ino linguist-language=Arduino
+arduino_code.c linguist-language=Arduino linguist-detectable=true
+UNO1_DHT11_Support.ino linguist-language=Arduino linguist-detectable=true
+
+# Backup code
+backup-code.c linguist-language=Arduino
