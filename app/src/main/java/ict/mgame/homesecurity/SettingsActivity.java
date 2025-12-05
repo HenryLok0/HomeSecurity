@@ -47,7 +47,6 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvSoundThresholdLabel;
     private android.widget.SeekBar seekSoundThreshold;
     // Light Sensor UI
-    private TextView tvLightRaw;
     private TextView tvLightPercent;
     private Button btnRefreshLight;
     // Alarm Test UI
@@ -99,7 +98,6 @@ public class SettingsActivity extends AppCompatActivity {
         seekSoundThreshold = findViewById(R.id.seekSoundThreshold);
         
         // Light Sensor Views
-        tvLightRaw = findViewById(R.id.tvLightRaw);
         tvLightPercent = findViewById(R.id.tvLightPercent);
         btnRefreshLight = findViewById(R.id.btnRefreshLight);
         
@@ -510,10 +508,8 @@ public class SettingsActivity extends AppCompatActivity {
     // ---------- Light Sensor helpers ----------
     private void loadLightValuesToUI() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        int raw = prefs.getInt(KEY_LIGHT_RAW, -1);
         int percent = prefs.getInt(KEY_LIGHT_PERCENT, -1);
 
-        if (tvLightRaw != null) tvLightRaw.setText(raw >= 0 ? String.valueOf(raw) : "--");
         if (tvLightPercent != null) tvLightPercent.setText(percent >= 0 ? (percent + " %") : "-- %");
     }
 
@@ -530,9 +526,6 @@ public class SettingsActivity extends AppCompatActivity {
     public static void notifyLightDataReceived(int raw, int percent) {
         if (instance != null) {
             instance.runOnUiThread(() -> {
-                if (instance.tvLightRaw != null && raw >= 0) {
-                    instance.tvLightRaw.setText(String.valueOf(raw));
-                }
                 if (instance.tvLightPercent != null) {
                     instance.tvLightPercent.setText(percent + " %");
                 }

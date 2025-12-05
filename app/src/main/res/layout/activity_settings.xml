@@ -395,30 +395,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:weightSum="2"
+                        android:weightSum="1"
                         android:layout_marginBottom="12dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Raw"
-                                android:textSize="14sp"
-                                android:textColor="@color/text_secondary"/>
-                            <TextView
-                                android:id="@+id/tvLightRaw"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="--"
-                                android:textSize="18sp"
-                                android:textStyle="bold"
-                                android:textColor="@color/text_primary"
-                                android:layout_marginTop="4dp"/>
-                        </LinearLayout>
 
                         <LinearLayout
                             android:layout_width="0dp"
