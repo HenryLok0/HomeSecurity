@@ -3,6 +3,7 @@ package ict.mgame.homesecurity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.TextView;
 import android.widget.Button;
@@ -17,7 +18,9 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -42,6 +45,9 @@ public class SettingsActivity extends AppCompatActivity {
     private Button btnStopBuzzer;
     // Buzzer Alarm Switch
     private SwitchMaterial switchBuzzerAlarm;
+    // Background Service UI
+    private MaterialButton btnBackgroundService;
+    private TextView tvBackgroundStatus;
     // Theme UI
     private AutoCompleteTextView themeDropdown;
 
@@ -83,6 +89,11 @@ public class SettingsActivity extends AppCompatActivity {
         // Buzzer Alarm Switch
         switchBuzzerAlarm = findViewById(R.id.switchBuzzerAlarm);
         setupBuzzerAlarmSwitch();
+
+        // Background Service Views
+        btnBackgroundService = findViewById(R.id.btnBackgroundService);
+        tvBackgroundStatus = findViewById(R.id.tvBackgroundStatus);
+        setupBackgroundService();
 
         // Theme Dropdown
         themeDropdown = findViewById(R.id.themeDropdown);
@@ -268,9 +279,58 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        updateBackgroundServiceUI();
+    }
+
+    @Override
     public boolean onSupportNavigateUp() {
         finish();
         return true;
+    }
+
+    private void setupBackgroundService() {
+        updateBackgroundServiceUI();
+        
+        btnBackgroundService.setOnClickListener(v -> {
+            if (BackgroundDetectionService.isRunning()) {
+                // Stop service
+                Intent serviceIntent = new Intent(this, BackgroundDetectionService.class);
+                stopService(serviceIntent);
+                Toast.makeText(this, "Background detection stopped", Toast.LENGTH_SHORT).show();
+            } else {
+                // Start service
+                Intent serviceIntent = new Intent(this, BackgroundDetectionService.class);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent);
+                } else {
+                    startService(serviceIntent);
+                }
+                Toast.makeText(this, "Background detection started", Toast.LENGTH_SHORT).show();
+            }
+            
+            // Update UI after a short delay
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                updateBackgroundServiceUI();
+            }, 500);
+        });
+    }
+
+    private void updateBackgroundServiceUI() {
+        boolean isRunning = BackgroundDetectionService.isRunning();
+        
+        if (isRunning) {
+            btnBackgroundService.setText("Stop Background Detection");
+            btnBackgroundService.setIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_media_pause));
+            tvBackgroundStatus.setText("Status: Running");
+            tvBackgroundStatus.setTextColor(ContextCompat.getColor(this, R.color.success));
+        } else {
+            btnBackgroundService.setText("Start Background Detection");
+            btnBackgroundService.setIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_media_play));
+            tvBackgroundStatus.setText("Status: Stopped");
+            tvBackgroundStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
+        }
     }
 
     private void setupBuzzerAlarmSwitch() {

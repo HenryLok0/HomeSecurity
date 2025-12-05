@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-feature android:name="android.hardware.camera.any" />
 
     <application
@@ -52,6 +56,13 @@
             android:name=".MediaViewerActivity"
             android:exported="false"
             android:parentActivityName=".HistoryActivity" />
+        
+        <!-- Background Detection Service -->
+        <service
+            android:name=".BackgroundDetectionService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
         
         <!-- FileProvider for sharing files -->
         <provider
