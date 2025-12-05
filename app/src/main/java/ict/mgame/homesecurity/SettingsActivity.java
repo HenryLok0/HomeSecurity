@@ -50,6 +50,13 @@ public class SettingsActivity extends AppCompatActivity {
         
         instance = this; // Set static reference
 
+        // Setup Toolbar
+        androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
         // Initialize Views
         lvBluetoothDevices = findViewById(R.id.lvBluetoothDevices);
         layoutNoDevice = findViewById(R.id.layoutNoDevice);
@@ -242,5 +249,11 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         instance = null; // Clear static reference
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 }
