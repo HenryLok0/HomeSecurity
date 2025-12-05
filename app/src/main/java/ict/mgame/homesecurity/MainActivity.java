@@ -598,24 +598,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void triggerAlarm() {
-        // Send alarm ON command to Arduino (if connected via Bluetooth)
-        if (connectedThread != null && isRemoteCameraActive) {
-            connectedThread.sendAlarmOn();
-            
-            // Schedule alarm OFF after 3 seconds
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                if (connectedThread != null) {
-                    connectedThread.sendAlarmOff();
-                }
-            }, 3000); // 3 seconds delay
-            
-            Log.d(TAG, "Alarm triggered: Buzzer ON for 3 seconds");
-        }
+        // Check if buzzer alarm is enabled
+        boolean buzzerEnabled = SettingsActivity.isBuzzerAlarmEnabled(this);
         
-        // Show notification to user on phone
-        runOnUiThread(() -> {
-            Toast.makeText(MainActivity.this, "⚠️ Motion Detected! Buzzer activated for 3 seconds", Toast.LENGTH_LONG).show();
-        });
+        if (buzzerEnabled) {
+            // Send alarm ON command to Arduino (if connected via Bluetooth)
+            if (connectedThread != null && isRemoteCameraActive) {
+                connectedThread.sendAlarmOn();
+                
+                // Schedule alarm OFF after 3 seconds
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    if (connectedThread != null) {
+                        connectedThread.sendAlarmOff();
+                    }
+                }, 3000); // 3 seconds delay
+                
+                Log.d(TAG, "Alarm triggered: Buzzer ON for 3 seconds");
+            }
+            
+            // Show notification to user on phone
+            runOnUiThread(() -> {
+                Toast.makeText(MainActivity.this, "⚠️ Motion Detected! Buzzer activated for 3 seconds", Toast.LENGTH_LONG).show();
+            });
+        } else {
+            // Buzzer disabled - notification only
+            Log.d(TAG, "Motion detected: Buzzer disabled, notification only");
+            runOnUiThread(() -> {
+                Toast.makeText(MainActivity.this, "⚠️ Motion Detected! (Buzzer alarm disabled)", Toast.LENGTH_LONG).show();
+            });
+        }
     }
     
     // Static method for SettingsActivity to send commands

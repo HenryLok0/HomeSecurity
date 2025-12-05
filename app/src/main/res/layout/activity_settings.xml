@@ -206,6 +206,43 @@
                         android:textColor="@color/primary_dark"
                         android:layout_marginBottom="16dp"/>
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="16dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Enable Alarm Buzzer"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/text_primary"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="When OFF, only notifications will be sent"
+                                android:textSize="12sp"
+                                android:textColor="@color/text_secondary"
+                                android:layout_marginTop="4dp"/>
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchBuzzerAlarm"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"/>
+                    </LinearLayout>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

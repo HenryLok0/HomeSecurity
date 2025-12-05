@@ -18,6 +18,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
@@ -39,6 +40,8 @@ public class SettingsActivity extends AppCompatActivity {
     // Alarm Test UI
     private Button btnStartBuzzer;
     private Button btnStopBuzzer;
+    // Buzzer Alarm Switch
+    private SwitchMaterial switchBuzzerAlarm;
     // Theme UI
     private AutoCompleteTextView themeDropdown;
 
@@ -76,6 +79,10 @@ public class SettingsActivity extends AppCompatActivity {
         // Alarm Test Views
         btnStartBuzzer = findViewById(R.id.btnStartBuzzer);
         btnStopBuzzer = findViewById(R.id.btnStopBuzzer);
+
+        // Buzzer Alarm Switch
+        switchBuzzerAlarm = findViewById(R.id.switchBuzzerAlarm);
+        setupBuzzerAlarmSwitch();
 
         // Theme Dropdown
         themeDropdown = findViewById(R.id.themeDropdown);
@@ -180,6 +187,7 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "HomeSecurityPrefs";
     private static final String KEY_DHT_TEMP = "dht_temp";
     private static final String KEY_DHT_HUM = "dht_humidity";
+    private static final String KEY_BUZZER_ALARM = "buzzer_alarm_enabled";
 
     private void loadDhtValuesToUI() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -263,6 +271,26 @@ public class SettingsActivity extends AppCompatActivity {
     public boolean onSupportNavigateUp() {
         finish();
         return true;
+    }
+
+    private void setupBuzzerAlarmSwitch() {
+        // Load saved preference
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean isEnabled = prefs.getBoolean(KEY_BUZZER_ALARM, true); // Default ON
+        switchBuzzerAlarm.setChecked(isEnabled);
+
+        // Set listener to save preference when toggled
+        switchBuzzerAlarm.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean(KEY_BUZZER_ALARM, isChecked).apply();
+            String status = isChecked ? "enabled" : "disabled";
+            Toast.makeText(this, "Buzzer alarm " + status, Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    // Static method to check if buzzer alarm is enabled
+    public static boolean isBuzzerAlarmEnabled(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        return prefs.getBoolean(KEY_BUZZER_ALARM, true); // Default ON
     }
 
     private void setupThemeDropdown() {
