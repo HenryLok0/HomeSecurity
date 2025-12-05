@@ -132,6 +132,7 @@ cd HomeSecurity
 - `a` - Activate alarm (buzzer + LED)
 - `x` - Deactivate alarm
 - `t` - Request temperature & humidity reading
+- `s` - Request sound level (HW-485)
 - `?` - Show help menu
 
 ## ⚙️ Configuration
@@ -140,6 +141,7 @@ cd HomeSecurity
 - **Bluetooth Device**: Select and connect to Arduino
 - **Background Detection**: Enable/disable background monitoring
 - **Buzzer Alarm**: Toggle physical alarm on motion detection
+ - **Sound Sensor (HW-485)**: Enable monitoring (poll every 0.3s), view RAW and %, set trigger volume threshold; when exceeded, app notifies and optionally triggers Arduino buzzer if enabled.
 - **Theme Mode**: Choose between Light, Dark, or Follow Device
 - **Password Reset**: Change login password
 - **DHT11 Sensor**: View temperature and humidity readings

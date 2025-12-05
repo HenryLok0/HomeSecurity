@@ -40,6 +40,12 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView tvTemperature;
     private TextView tvHumidity;
     private Button btnRefreshDht;
+    // Sound Sensor UI
+    private com.google.android.material.switchmaterial.SwitchMaterial switchSoundMonitor;
+    private TextView tvSoundRaw;
+    private TextView tvSoundPercent;
+    private TextView tvSoundThresholdLabel;
+    private android.widget.SeekBar seekSoundThreshold;
     // Alarm Test UI
     private Button btnStartBuzzer;
     private Button btnStopBuzzer;
@@ -81,6 +87,12 @@ public class SettingsActivity extends AppCompatActivity {
         tvTemperature = findViewById(R.id.tvTemperature);
         tvHumidity = findViewById(R.id.tvHumidity);
         btnRefreshDht = findViewById(R.id.btnRefreshDht);
+        // Sound Sensor Views
+        switchSoundMonitor = findViewById(R.id.switchSoundMonitor);
+        tvSoundRaw = findViewById(R.id.tvSoundRaw);
+        tvSoundPercent = findViewById(R.id.tvSoundPercent);
+        tvSoundThresholdLabel = findViewById(R.id.tvSoundThresholdLabel);
+        seekSoundThreshold = findViewById(R.id.seekSoundThreshold);
         
         // Alarm Test Views
         btnStartBuzzer = findViewById(R.id.btnStartBuzzer);
@@ -101,8 +113,12 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Load saved DHT values
         loadDhtValuesToUI();
+        // Load saved Sound values
+        loadSoundValuesToUI();
 
         btnRefreshDht.setOnClickListener(v -> requestDhtData());
+        // Setup Sound Sensor controls
+        setupSoundSensorControls();
         
         // Alarm Test Listeners
         btnStartBuzzer.setOnClickListener(v -> sendAlarmCommand('a'));
@@ -199,6 +215,11 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String KEY_DHT_TEMP = "dht_temp";
     private static final String KEY_DHT_HUM = "dht_humidity";
     private static final String KEY_BUZZER_ALARM = "buzzer_alarm_enabled";
+    // Sound sensor keys
+    private static final String KEY_SOUND_ENABLED = "sound_monitor_enabled";
+    private static final String KEY_SOUND_THRESHOLD = "sound_threshold_percent";
+    private static final String KEY_SOUND_RAW = "sound_raw";
+    private static final String KEY_SOUND_PERCENT = "sound_percent";
 
     private void loadDhtValuesToUI() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -276,12 +297,18 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         instance = null; // Clear static reference
+        // Stop sound polling to avoid leaks
+        stopSoundPolling();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         updateBackgroundServiceUI();
+        // Resume sound polling if monitoring is enabled
+        if (switchSoundMonitor != null && switchSoundMonitor.isChecked()) {
+            startSoundPolling();
+        }
     }
 
     @Override
@@ -345,6 +372,96 @@ public class SettingsActivity extends AppCompatActivity {
             String status = isChecked ? "enabled" : "disabled";
             Toast.makeText(this, "Buzzer alarm " + status, Toast.LENGTH_SHORT).show();
         });
+    }
+
+    // ---------- Sound Sensor helpers ----------
+    private void loadSoundValuesToUI() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int raw = prefs.getInt(KEY_SOUND_RAW, -1);
+        int percent = prefs.getInt(KEY_SOUND_PERCENT, -1);
+        int threshold = prefs.getInt(KEY_SOUND_THRESHOLD, 50);
+        boolean enabled = prefs.getBoolean(KEY_SOUND_ENABLED, false);
+
+        if (tvSoundRaw != null) tvSoundRaw.setText(raw >= 0 ? String.valueOf(raw) : "--");
+        if (tvSoundPercent != null) tvSoundPercent.setText(percent >= 0 ? (percent + " %") : "-- %");
+        if (tvSoundThresholdLabel != null) tvSoundThresholdLabel.setText("Trigger volume: " + threshold + "%");
+        if (seekSoundThreshold != null) seekSoundThreshold.setProgress(threshold);
+        if (switchSoundMonitor != null) switchSoundMonitor.setChecked(enabled);
+    }
+
+    private void setupSoundSensorControls() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        if (seekSoundThreshold != null) {
+            seekSoundThreshold.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                    if (tvSoundThresholdLabel != null) tvSoundThresholdLabel.setText("Trigger volume: " + progress + "%");
+                    prefs.edit().putInt(KEY_SOUND_THRESHOLD, progress).apply();
+                }
+                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+            });
+        }
+
+        if (switchSoundMonitor != null) {
+            switchSoundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                prefs.edit().putBoolean(KEY_SOUND_ENABLED, isChecked).apply();
+                if (isChecked) {
+                    startSoundPolling();
+                    Toast.makeText(this, "Sound monitoring enabled", Toast.LENGTH_SHORT).show();
+                } else {
+                    stopSoundPolling();
+                    Toast.makeText(this, "Sound monitoring disabled", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
+    // Polling every 300ms when enabled
+    private final android.os.Handler soundHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable soundPollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            MainActivity.sendBluetoothCommand('s');
+            soundHandler.postDelayed(this, 300);
+        }
+    };
+
+    private void startSoundPolling() {
+        stopSoundPolling();
+        soundHandler.postDelayed(soundPollRunnable, 300);
+    }
+
+    private void stopSoundPolling() {
+        soundHandler.removeCallbacks(soundPollRunnable);
+    }
+
+    public static void saveSoundValues(Context ctx, int raw, int percent) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit()
+            .putInt(KEY_SOUND_RAW, raw)
+            .putInt(KEY_SOUND_PERCENT, percent)
+            .apply();
+    }
+
+    public static void notifySoundDataReceived(int raw, int percent) {
+        if (instance != null) {
+            instance.runOnUiThread(() -> {
+                if (instance.tvSoundRaw != null) instance.tvSoundRaw.setText(String.valueOf(raw));
+                if (instance.tvSoundPercent != null) instance.tvSoundPercent.setText(percent + " %");
+            });
+        }
+    }
+
+    public static boolean isSoundMonitoringEnabled(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        return prefs.getBoolean(KEY_SOUND_ENABLED, false);
+    }
+
+    public static int getSoundThresholdPercent(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        return prefs.getInt(KEY_SOUND_THRESHOLD, 50);
     }
 
     // Static method to check if buzzer alarm is enabled

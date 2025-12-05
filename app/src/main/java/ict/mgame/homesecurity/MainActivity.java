@@ -647,6 +647,8 @@ public class MainActivity extends AppCompatActivity {
                     connectedThread.sendAlarmOff();
                 } else if (command == 't') {
                     connectedThread.requestDhtData();
+                } else if (command == 's') {
+                    connectedThread.requestSoundData();
                 }
                 return true;
             } catch (Exception e) {
@@ -1037,6 +1039,47 @@ public class MainActivity extends AppCompatActivity {
                                         } catch (Exception e) {
                                             Log.w(TAG, "Failed to parse DHT line: " + line, e);
                                         }
+                                    } else if (line.toUpperCase().contains("SOUND_RAW=") && line.toUpperCase().contains("SOUND_PERCENT=")) {
+                                        try {
+                                            // Parse SOUND_RAW
+                                            int rawStart = line.toUpperCase().indexOf("SOUND_RAW=") + 10;
+                                            int rawEnd = line.indexOf(",", rawStart);
+                                            if (rawEnd == -1) rawEnd = line.length();
+                                            String rawStr = line.substring(rawStart, rawEnd).trim();
+
+                                            // Parse SOUND_PERCENT
+                                            int percentStart = line.toUpperCase().indexOf("SOUND_PERCENT=") + 14;
+                                            int percentEnd = line.indexOf("%", percentStart);
+                                            if (percentEnd == -1) percentEnd = line.length();
+                                            String percentStr = line.substring(percentStart, percentEnd).trim();
+
+                                            int raw = Integer.parseInt(rawStr);
+                                            int percent = Integer.parseInt(percentStr);
+                                            Log.d(TAG, "Parsed SOUND -> RAW=" + raw + " PERCENT=" + percent + "%");
+
+                                            // persist and notify Settings UI
+                                            SettingsActivity.saveSoundValues(MainActivity.this, raw, percent);
+                                            SettingsActivity.notifySoundDataReceived(raw, percent);
+
+                                            // Threshold check
+                                            boolean monitorEnabled = SettingsActivity.isSoundMonitoringEnabled(MainActivity.this);
+                                            int threshold = SettingsActivity.getSoundThresholdPercent(MainActivity.this);
+                                            if (monitorEnabled && percent >= threshold) {
+                                                long currentTime = System.currentTimeMillis();
+                                                if (currentTime - lastMotionNotificationTime >= MOTION_NOTIFICATION_COOLDOWN_MS) {
+                                                    lastMotionNotificationTime = currentTime;
+                                                    runOnUiThread(() -> {
+                                                        if (tvNotification != null) {
+                                                            tvNotification.setText("Sound level exceeded: " + percent + "% (>= " + threshold + "%)");
+                                                        }
+                                                    });
+                                                    // Trigger alarm (will honor buzzer enabled setting)
+                                                    triggerAlarm();
+                                                }
+                                            }
+                                        } catch (Exception e) {
+                                            Log.w(TAG, "Failed to parse SOUND line: " + line, e);
+                                        }
                                     }
                                     processedUpTo += parts[i].getBytes().length + 1;
                                     if (isLast) break;
@@ -1068,6 +1111,18 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Sent 't' command to Arduino");
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to send DHT request", e);
+                }
+            }
+        }
+
+        public void requestSoundData() {
+            if (mmOutStream != null) {
+                try {
+                    mmOutStream.write('s');
+                    mmOutStream.flush();
+                    Log.d(TAG, "Sent 's' command to Arduino");
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to send SOUND request", e);
                 }
             }
         }

@@ -1,72 +1,87 @@
-// UNO1: HomeSecurity + Bluetooth + Serial bridge to UNO2 (camera board)
+// UNO1: HomeSecurity + 蓝牙 + 串口桥接到 UNO2（摄像头板）
+// 现在额外加入：声音传感器(HW-485) 模拟音量读取
 
 #include <SoftwareSerial.h>
-#include <ctype.h> // tolower()
-#include <DHT.h>   // Install Adafruit DHT library via Library Manager first
+#include <ctype.h>   // tolower()
+#include <DHT.h>     // 需要先在库管理器安装 Adafruit 的 DHT 库
 
 // ----------------------
-// Bluetooth HC-05 Connection (UNO1)
+// 蓝牙 HC-05 接法（UNO1）
 // BT TXD -> D2 (UNO1 RX)
 // BT RXD -> D3 (UNO1 TX, via resistor divider)
 // ----------------------
-const int BT_RX_PIN = 2; // Connect to HC-05 TXD
-const int BT_TX_PIN = 3; // Connect to HC-05 RXD (via voltage divider)
+const int BT_RX_PIN = 2;  // 接 HC-05 TXD
+const int BT_TX_PIN = 3;  // 接 HC-05 RXD（经分压）
 
-SoftwareSerial BT(BT_RX_PIN, BT_TX_PIN); // RX, TX
+SoftwareSerial BT(BT_RX_PIN, BT_TX_PIN);  // RX, TX
 
 // ----------------------
-// Alarm Devices (UNO1)
+// 报警设备（UNO1）
 // ----------------------
-// HW-512 Active Buzzer: + -> D6, - -> GND
+// HW-512 有源蜂鸣器: + -> D6, - -> GND
 const int buzzerPin = 6;
 
-// HW-477 Dual-Color LED (Common Cathode): - -> GND, R -> Resistor -> D9, G -> Resistor -> D10
-const int redPin = 9;
+// HW-477 双色 LED (共阴极): - -> GND, R -> 电阻 -> D9, G -> 电阻 -> D10
+const int redPin   = 9;
 const int greenPin = 10;
 
 // ----------------------
-// DHT11 (HW-507) Temperature & Humidity Sensor
+// DHT11 (HW-507) 温湿度传感器
 //   VCC -> 5V, GND -> GND, OUT -> D7
 // ----------------------
-#define DHTPIN 7
-#define DHTTYPE DHT11
+#define DHTPIN   7
+#define DHTTYPE  DHT11
 
 DHT dht(DHTPIN, DHTTYPE);
 
-// DHT11 reading cache
+// DHT11 读数缓存
 unsigned long lastDhtReadTime = 0;
-const unsigned long DHT_INTERVAL = 2000; // At least once every 2 seconds
+const unsigned long DHT_INTERVAL = 2000; // 至少 2 秒一次
 float lastTemp = NAN;
-float lastHum = NAN;
+float lastHum  = NAN;
 
-// Alarm state
+// ----------------------
+// 声音传感器 HW-485 (高感度声音模块，使用 AO)
+//   VCC -> 5V, GND -> GND, AO -> A0
+// ----------------------
+const int soundAnalogPin = A0;
+
+// 可选：做一个简单平均，避免抖动
+int readSoundLevel() {
+  const int SAMPLE_COUNT = 10;
+  long sum = 0;
+  for (int i = 0; i < SAMPLE_COUNT; i++) {
+    sum += analogRead(soundAnalogPin); // 0~1023
+  }
+  int avg = sum / SAMPLE_COUNT;
+  return avg;
+}
+
+// 报警状态
 bool alarmOn = false;
 
-// Use millis() for blinking
+// 用 millis() 做闪烁
 unsigned long lastToggleTime = 0;
-const unsigned long alarmInterval = 300; // Blink interval (ms)
-bool alarmOutputState = false;           // Current output HIGH/LOW
+const unsigned long alarmInterval = 300; // 闪烁间隔 (ms)
+bool alarmOutputState = false;           // 当前输出 HIGH/LOW
 
 // ----------------------
-// Read DHT11 (resample only when necessary)
+// 读取 DHT11（必要时才重新采样）
 // ----------------------
-bool readDHTIfNeeded()
-{
+bool readDHTIfNeeded() {
   unsigned long now = millis();
 
   if ((now - lastDhtReadTime < DHT_INTERVAL) &&
-      !isnan(lastTemp) && !isnan(lastHum))
-  {
-    // Interval too short and has cache → use cache
+      !isnan(lastTemp) && !isnan(lastHum)) {
+    // 间隔太短 且 有缓存 → 用缓存
     return true;
   }
 
   float h = dht.readHumidity();
-  float t = dht.readTemperature(); // Celsius temperature
+  float t = dht.readTemperature(); // 摄氏温度
 
-  if (isnan(h) || isnan(t))
-  {
-    return false; // Read failed
+  if (isnan(h) || isnan(t)) {
+    return false;  // 读取失败
   }
 
   lastHum = h;
@@ -76,21 +91,18 @@ bool readDHTIfNeeded()
 }
 
 // ----------------------
-// Handle a command received from phone via Bluetooth
+// 处理从手机蓝牙收到的一条命令
 // ----------------------
-void handleBtCommand(char c)
-{
+void handleBtCommand(char c) {
   char cmd = tolower(c);
 
-  if (cmd == 'a')
-  {
-    // Start alarm
+  if (cmd == 'a') {
+    // 开启警报
     alarmOn = true;
     BT.println(F("ALARM ON"));
-  }
-  else if (cmd == 'x')
-  {
-    // Stop alarm
+
+  } else if (cmd == 'x') {
+    // 关闭警报
     alarmOn = false;
     BT.println(F("ALARM OFF"));
 
@@ -98,12 +110,10 @@ void handleBtCommand(char c)
     digitalWrite(buzzerPin, LOW);
     digitalWrite(redPin, LOW);
     digitalWrite(greenPin, LOW);
-  }
-  else if (cmd == 't')
-  {
-    // Request temperature & humidity
-    if (!readDHTIfNeeded())
-    {
+
+  } else if (cmd == 't') {
+    // 请求温湿度
+    if (!readDHTIfNeeded()) {
       BT.println(F("ERROR: Failed to read from DHT11 sensor."));
       return;
     }
@@ -113,43 +123,55 @@ void handleBtCommand(char c)
     BT.print(F(" C, HUM="));
     BT.print(lastHum, 1);
     BT.println(F(" %"));
-  }
-  else if (cmd == '?')
-  {
-    // Help menu
+
+  } else if (cmd == 's') {
+    // 请求当前声音强度
+    int raw = readSoundLevel();                // 0~1023
+    int percent = map(raw, 0, 1023, 0, 100);   // 映射为 0~100%
+
+    BT.print(F("SOUND_RAW="));
+    BT.print(raw);
+    BT.print(F(", SOUND_PERCENT="));
+    BT.print(percent);
+    BT.println(F("%"));
+
+  } else if (cmd == '?') {
+    // 帮助菜单
     BT.println(F("HomeSecurity Commands:"));
     BT.println(F("  a - alarm ON (buzzer + HW-477 blink)"));
     BT.println(F("  x - alarm OFF"));
     BT.println(F("  t - read DHT11 temperature & humidity"));
+    BT.println(F("  s - read sound level (0-1023, 0-100%)"));
     BT.println(F("  ? - show this help"));
     BT.println(F("Other chars will be forwarded to UNO2 (camera)."));
-  }
-  else
-  {
-    // Other characters: forward to UNO2 (camera board parses itself)
+
+  } else {
+    // 其它字符：转发给 UNO2（摄像头板自己解析）
     Serial.write(c);
   }
 }
 
-void setup()
-{
-  // Serial 0: Connect to UNO2 (camera board)
-  // ⚠️ Must match Serial.begin(...) in UNO2
+void setup() {
+  // 串口 0：连接 UNO2（摄像头板）
+  // ⚠️ 一定要和 UNO2 里的 Serial.begin(...) 一样
   Serial.begin(115200);
 
-  // Bluetooth serial
-  BT.begin(9600); // HC-05 default 9600 9600
+  // 蓝牙串口
+  BT.begin(9600);   // HC-05 默认 9600
 
-  // IO mode
+  // IO 模式
   pinMode(buzzerPin, OUTPUT);
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
+
+  // 声音传感器模拟口（其实默认就是输入，这里只是写清楚）
+  pinMode(soundAnalogPin, INPUT);
 
   digitalWrite(buzzerPin, LOW);
   digitalWrite(redPin, LOW);
   digitalWrite(greenPin, LOW);
 
-  // DHT11 initialization
+  // DHT11 初始化
   dht.begin();
   lastDhtReadTime = 0;
 
@@ -158,47 +180,39 @@ void setup()
   lastToggleTime = millis();
 
   BT.println(F("UNO1: HomeSecurity + Camera Bridge ready."));
-  BT.println(F("Commands: a/x/t/?  (other chars -> UNO2)"));
+  BT.println(F("Commands: a/x/t/s/?  (other chars -> UNO2)"));
 }
 
-void loop()
-{
-  // 1) Receive data from UNO2 (Serial) → forward as-is to Bluetooth (to phone App)
-  while (Serial.available())
-  {
+void loop() {
+  // 1) 从 UNO2 (Serial) 收数据 → 原样转发到蓝牙（给手机 App）
+  while (Serial.available()) {
     uint8_t b = Serial.read();
     BT.write(b);
   }
 
-  // 2) Receive commands from Bluetooth → process / forward
-  while (BT.available())
-  {
+  // 2) 从蓝牙收到命令 → 处理 / 转发
+  while (BT.available()) {
     char c = BT.read();
-    if (c == '\r' || c == '\n')
-    {
-      continue; // Ignore carriage return and newline
+    if (c == '\r' || c == '\n') {
+      continue; // 忽略回车换行
     }
     handleBtCommand(c);
   }
 
-  // 3) Alarm blink logic (non-blocking)
+  // 3) 报警闪烁逻辑（非阻塞）
   unsigned long now = millis();
 
-  if (alarmOn)
-  {
-    if (now - lastToggleTime >= alarmInterval)
-    {
+  if (alarmOn) {
+    if (now - lastToggleTime >= alarmInterval) {
       lastToggleTime = now;
       alarmOutputState = !alarmOutputState;
 
       digitalWrite(buzzerPin, alarmOutputState ? HIGH : LOW);
-      digitalWrite(redPin, alarmOutputState ? HIGH : LOW);
-      digitalWrite(greenPin, alarmOutputState ? HIGH : LOW);
+      digitalWrite(redPin,    alarmOutputState ? HIGH : LOW);
+      digitalWrite(greenPin,  alarmOutputState ? HIGH : LOW);
     }
-  }
-  else
-  {
-    // For safety, keep them off
+  } else {
+    // 安全起见，再次保持关闭
     digitalWrite(buzzerPin, LOW);
     digitalWrite(redPin, LOW);
     digitalWrite(greenPin, LOW);
