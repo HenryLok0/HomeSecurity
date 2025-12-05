@@ -108,6 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnRecordVideo;
     private View btnGallery;
     private View btnNotifications;
+    private View btnHomeData;
     private MaterialButton btnLogout;
     private MaterialButton btnMotionSensor;
     private MaterialButton btnSwitchCamera;
@@ -178,6 +179,7 @@ public class MainActivity extends AppCompatActivity {
         btnRecordVideo = findViewById(R.id.btnRecordVideo);
         btnGallery = findViewById(R.id.btnGallery);
         btnNotifications = findViewById(R.id.btnNotifications);
+        btnHomeData = findViewById(R.id.btnHomeData);
         btnLogout = findViewById(R.id.btnLogout);
         btnMotionSensor = findViewById(R.id.btnMotionSensor);
         btnSwitchCamera = findViewById(R.id.btnSwitchCamera);
@@ -219,6 +221,13 @@ public class MainActivity extends AppCompatActivity {
         });
 
         btnNotifications.setOnClickListener(v -> showNotificationHistory());
+
+        if (btnHomeData != null) {
+            btnHomeData.setOnClickListener(v -> {
+                Intent intent = new Intent(MainActivity.this, HomeDataActivity.class);
+                startActivity(intent);
+            });
+        }
 
         btnLogout.setOnClickListener(v -> {
             SharedPreferences sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE);
@@ -650,6 +659,8 @@ public class MainActivity extends AppCompatActivity {
                     connectedThread.requestDhtData();
                 } else if (command == 's') {
                     connectedThread.requestSoundData();
+                } else if (command == 'l') {
+                    connectedThread.requestLightData();
                 }
                 return true;
             } catch (Exception e) {
@@ -910,8 +921,8 @@ public class MainActivity extends AppCompatActivity {
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
         private volatile boolean isRunning = true;
-        private long lastDhtRequestTime = 0;
-        private static final long DHT_REQUEST_INTERVAL = 5000; // Request every 5 seconds
+        private long lastEnvRequestTime = 0;
+        private static final long ENV_REQUEST_INTERVAL = 500; // Request every 0.5 seconds
 
         public ConnectedThread(BluetoothSocket socket) {
             InputStream tmpIn = null;
@@ -931,16 +942,16 @@ public class MainActivity extends AppCompatActivity {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] readTmp = new byte[1024];
             
-            // Request initial DHT11 reading after connection established
-            new Handler(Looper.getMainLooper()).postDelayed(this::requestDhtData, 1000); 
+            // Request initial data after connection established
+            new Handler(Looper.getMainLooper()).postDelayed(this::requestEnvData, 1000); 
             
             while (isRunning) {
                 try {
-                    // Periodic DHT11 data request (every 5 seconds)
+                    // Periodic ENV data request (every 0.5 seconds)
                     long now = System.currentTimeMillis();
-                    if (now - lastDhtRequestTime >= DHT_REQUEST_INTERVAL) {
-                        requestDhtData();
-                        lastDhtRequestTime = now;
+                    if (now - lastEnvRequestTime >= ENV_REQUEST_INTERVAL) {
+                        requestEnvData();
+                        lastEnvRequestTime = now;
                     }
                     
                     if (mmInStream == null) break;
@@ -1075,6 +1086,49 @@ public class MainActivity extends AppCompatActivity {
         private void processTextLine(String line) {
             if (line.isEmpty()) return;
             
+            // Handle ENV snapshot: ENV: TEMP=25.0 C, HUM=60.0 %, SOUND=50%, LIGHT=80%
+            if (line.startsWith("ENV:")) {
+                try {
+                    // Parse Temp
+                    int tempStart = line.indexOf("TEMP=") + 5;
+                    int tempEnd = line.indexOf(" ", tempStart);
+                    float t = Float.parseFloat(line.substring(tempStart, tempEnd));
+
+                    // Parse Hum
+                    int humStart = line.indexOf("HUM=") + 4;
+                    int humEnd = line.indexOf(" ", humStart);
+                    float h = Float.parseFloat(line.substring(humStart, humEnd));
+
+                    // Parse Sound
+                    int soundStart = line.indexOf("SOUND=") + 6;
+                    int soundEnd = line.indexOf("%", soundStart);
+                    int s = Integer.parseInt(line.substring(soundStart, soundEnd));
+
+                    // Parse Light
+                    int lightStart = line.indexOf("LIGHT=") + 6;
+                    int lightEnd = line.indexOf("%", lightStart);
+                    int l = Integer.parseInt(line.substring(lightStart, lightEnd));
+
+                    // Save to SensorDataManager
+                    SensorDataManager.getInstance().addData(t, h, s, l);
+
+                    // Also update SettingsActivity UI if needed
+                    SettingsActivity.saveDhtValues(MainActivity.this, t, h);
+                    SettingsActivity.notifyDhtDataReceived(t, h);
+                    SettingsActivity.notifySoundDataReceived(-1, s); // -1 for raw since we only get percent here
+                    SettingsActivity.notifyLightDataReceived(-1, l);
+
+                    runOnUiThread(() -> {
+                        if (tvStatus != null) {
+                            tvStatus.setText(String.format(Locale.getDefault(), "System Status: Remote Camera — %.1f°C %.0f%%", t, h));
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to parse ENV line: " + line, e);
+                }
+                return;
+            }
+
             if (line.toUpperCase().contains("TEMP=") && line.toUpperCase().contains("HUM=")) {
                 try {
                     int tempStart = line.toUpperCase().indexOf("TEMP=") + 5;
@@ -1193,6 +1247,30 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Sent 's' command to Arduino");
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to send SOUND request", e);
+                }
+            }
+        }
+
+        public void requestLightData() {
+            if (mmOutStream != null) {
+                try {
+                    mmOutStream.write('l');
+                    mmOutStream.flush();
+                    Log.d(TAG, "Sent 'l' command to Arduino");
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to send LIGHT request", e);
+                }
+            }
+        }
+
+        public void requestEnvData() {
+            if (mmOutStream != null) {
+                try {
+                    mmOutStream.write('e');
+                    mmOutStream.flush();
+                    // Log.d(TAG, "Sent 'e' command to Arduino"); // Commented out to avoid spamming logs
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to send ENV request", e);
                 }
             }
         }
