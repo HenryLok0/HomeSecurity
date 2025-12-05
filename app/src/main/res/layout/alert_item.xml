@@ -5,7 +5,8 @@
     android:layout_height="wrap_content"
     android:layout_margin="6dp"
     app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="@color/surface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -52,7 +53,7 @@
                 android:layout_height="wrap_content"
                 android:text="2025-12-04 12:00:00"
                 android:textSize="12sp"
-                android:textColor="#888888"
+                android:textColor="@color/text_secondary"
                 android:layout_marginTop="4dp" />
         </LinearLayout>
 

@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5"
+    android:background="@color/background"
     tools:context=".HistoryActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -15,10 +15,11 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="#FFFFFF"
+            android:background="@color/surface"
             app:title="History"
-            app:titleTextColor="#000000"
-            app:navigationIcon="@android:drawable/ic_menu_revert" />
+            app:titleTextColor="@color/text_primary"
+            app:navigationIcon="@android:drawable/ic_menu_revert"
+            app:navigationIconTint="@color/text_primary" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -37,6 +38,6 @@
         android:visibility="gone"
         android:layout_gravity="center"
         android:textSize="16sp"
-        android:textColor="#757575"/>
+        android:textColor="@color/text_secondary"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
