@@ -10,11 +10,13 @@ import java.util.Locale;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -37,6 +39,8 @@ public class SettingsActivity extends AppCompatActivity {
     // Alarm Test UI
     private Button btnStartBuzzer;
     private Button btnStopBuzzer;
+    // Theme UI
+    private AutoCompleteTextView themeDropdown;
 
     private BluetoothAdapter bluetoothAdapter;
     private ArrayList<String> deviceList;
@@ -72,6 +76,10 @@ public class SettingsActivity extends AppCompatActivity {
         // Alarm Test Views
         btnStartBuzzer = findViewById(R.id.btnStartBuzzer);
         btnStopBuzzer = findViewById(R.id.btnStopBuzzer);
+
+        // Theme Dropdown
+        themeDropdown = findViewById(R.id.themeDropdown);
+        setupThemeDropdown();
 
         // Load saved DHT values
         loadDhtValuesToUI();
@@ -255,5 +263,67 @@ public class SettingsActivity extends AppCompatActivity {
     public boolean onSupportNavigateUp() {
         finish();
         return true;
+    }
+
+    private void setupThemeDropdown() {
+        String[] themeOptions = new String[]{
+            "Follow Device Mode",
+            "Light Mode",
+            "Dark Mode"
+        };
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+            this,
+            android.R.layout.simple_dropdown_item_1line,
+            themeOptions
+        );
+        themeDropdown.setAdapter(adapter);
+
+        // Load saved theme preference
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int savedTheme = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        String selectedTheme;
+        switch (savedTheme) {
+            case AppCompatDelegate.MODE_NIGHT_NO:
+                selectedTheme = "Light Mode";
+                break;
+            case AppCompatDelegate.MODE_NIGHT_YES:
+                selectedTheme = "Dark Mode";
+                break;
+            default:
+                selectedTheme = "Follow Device Mode";
+                break;
+        }
+        themeDropdown.setText(selectedTheme, false);
+
+        // Set item click listener
+        themeDropdown.setOnItemClickListener((parent, view, position, id) -> {
+            int themeMode;
+            switch (position) {
+                case 1: // Light Mode
+                    themeMode = AppCompatDelegate.MODE_NIGHT_NO;
+                    break;
+                case 2: // Dark Mode
+                    themeMode = AppCompatDelegate.MODE_NIGHT_YES;
+                    break;
+                default: // Follow Device Mode
+                    themeMode = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM;
+                    break;
+            }
+
+            // Get current theme mode to check if it's different
+            int currentTheme = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+            
+            if (currentTheme != themeMode) {
+                // Save preference
+                prefs.edit().putInt("theme_mode", themeMode).apply();
+
+                // Apply theme immediately by recreating the activity
+                AppCompatDelegate.setDefaultNightMode(themeMode);
+                
+                // Recreate activity to apply theme
+                recreate();
+            }
+        });
     }
 }

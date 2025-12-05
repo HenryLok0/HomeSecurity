@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5"
+    android:background="@color/background"
     tools:context=".SettingsActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -15,11 +15,11 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="#FFFFFF"
+            android:background="@color/surface"
             app:title="@string/title_settings"
-            app:titleTextColor="#000000"
+            app:titleTextColor="@color/text_primary"
             app:navigationIcon="@android:drawable/ic_menu_revert"
-            app:navigationIconTint="#000000"/>
+            app:navigationIconTint="@color/text_primary"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -40,7 +40,7 @@
                 android:layout_marginBottom="24dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/surface">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -54,13 +54,13 @@
                         android:text="Connected Bluetooth Devices"
                         android:textStyle="bold"
                         android:textSize="18sp"
-                        android:textColor="#1A237E"
+                        android:textColor="@color/primary_dark"
                         android:layout_marginBottom="16dp"/>
 
                     <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="200dp"
-                        android:background="#FAFAFA">
+                        android:background="@color/surface_variant">
 
                         <ListView
                             android:id="@+id/lvBluetoothDevices"
@@ -81,13 +81,13 @@
                                 android:layout_width="48dp"
                                 android:layout_height="48dp"
                                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                                app:tint="#BDBDBD"/>
+                                app:tint="@color/text_disabled"/>
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="(No device connected)"
-                                android:textColor="#BDBDBD"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="16sp"
                                 android:layout_marginTop="8dp"/>
                         </LinearLayout>
@@ -103,7 +103,7 @@
                 android:layout_marginBottom="24dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/surface">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -117,7 +117,7 @@
                         android:text="Environment Sensor (DHT11)"
                         android:textStyle="bold"
                         android:textSize="18sp"
-                        android:textColor="#1A237E"
+                        android:textColor="@color/primary_dark"
                         android:layout_marginBottom="16dp"/>
 
                     <LinearLayout
@@ -189,7 +189,7 @@
                 android:layout_marginBottom="24dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/surface">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -203,7 +203,7 @@
                         android:text="Alarm Test (Buzzer)"
                         android:textStyle="bold"
                         android:textSize="18sp"
-                        android:textColor="#1A237E"
+                        android:textColor="@color/primary_dark"
                         android:layout_marginBottom="16dp"/>
 
                     <TextView
@@ -250,7 +250,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="#FFFFFF">
+                app:cardBackgroundColor="@color/surface">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -264,7 +264,7 @@
                         android:text="Reset Password"
                         android:textStyle="bold"
                         android:textSize="18sp"
-                        android:textColor="#1A237E"
+                        android:textColor="@color/primary_dark"
                         android:layout_marginBottom="16dp"/>
 
                     <com.google.android.material.textfield.TextInputLayout
@@ -310,6 +310,58 @@
                         android:text="Reset Password"
                         android:padding="12dp"
                         app:cornerRadius="8dp"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Theme Mode Section -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/surface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Appearance"
+                        android:textStyle="bold"
+                        android:textSize="18sp"
+                        android:textColor="@color/primary_dark"
+                        android:layout_marginBottom="8dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Choose your preferred theme"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="16dp"/>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/themeDropdownLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Theme Mode"
+                        app:boxStrokeColor="@color/primary"
+                        app:hintTextColor="@color/primary"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/themeDropdown"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:textColor="@color/text_primary"
+                            android:padding="16dp"/>
+                    </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
