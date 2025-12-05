@@ -476,17 +476,23 @@ public class SettingsActivity extends AppCompatActivity {
 
     public static void saveSoundValues(Context ctx, int raw, int percent) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit()
-            .putInt(KEY_SOUND_RAW, raw)
-            .putInt(KEY_SOUND_PERCENT, percent)
-            .apply();
+        SharedPreferences.Editor editor = prefs.edit();
+        if (raw >= 0) {
+            editor.putInt(KEY_SOUND_RAW, raw);
+        }
+        editor.putInt(KEY_SOUND_PERCENT, percent);
+        editor.apply();
     }
 
     public static void notifySoundDataReceived(int raw, int percent) {
         if (instance != null) {
             instance.runOnUiThread(() -> {
-                if (instance.tvSoundRaw != null) instance.tvSoundRaw.setText(String.valueOf(raw));
-                if (instance.tvSoundPercent != null) instance.tvSoundPercent.setText(percent + " %");
+                if (instance.tvSoundRaw != null && raw >= 0) {
+                    instance.tvSoundRaw.setText(String.valueOf(raw));
+                }
+                if (instance.tvSoundPercent != null) {
+                    instance.tvSoundPercent.setText(percent + " %");
+                }
             });
         }
     }
@@ -513,17 +519,23 @@ public class SettingsActivity extends AppCompatActivity {
 
     public static void saveLightValues(Context ctx, int raw, int percent) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit()
-            .putInt(KEY_LIGHT_RAW, raw)
-            .putInt(KEY_LIGHT_PERCENT, percent)
-            .apply();
+        SharedPreferences.Editor editor = prefs.edit();
+        if (raw >= 0) {
+            editor.putInt(KEY_LIGHT_RAW, raw);
+        }
+        editor.putInt(KEY_LIGHT_PERCENT, percent);
+        editor.apply();
     }
 
     public static void notifyLightDataReceived(int raw, int percent) {
         if (instance != null) {
             instance.runOnUiThread(() -> {
-                if (instance.tvLightRaw != null) instance.tvLightRaw.setText(String.valueOf(raw));
-                if (instance.tvLightPercent != null) instance.tvLightPercent.setText(percent + " %");
+                if (instance.tvLightRaw != null && raw >= 0) {
+                    instance.tvLightRaw.setText(String.valueOf(raw));
+                }
+                if (instance.tvLightPercent != null) {
+                    instance.tvLightPercent.setText(percent + " %");
+                }
             });
         }
     }
