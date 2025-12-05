@@ -12,7 +12,7 @@ A comprehensive Android home security application with motion detection, remote 
 - **Real-time Motion Detection** - AI-powered motion detection using CameraX.
 - **Home Data Dashboard** - **NEW!** Real-time line graphs for Temperature, Humidity, Sound, and Light levels.
 - **Live Camera Monitoring** - View live camera feed on your Android device.
-- **Remote Camera Support** - Connect to Arduino-based camera modules via Bluetooth.
+- **Remote Camera Support** - Connect to Arduino-based camera modules (OV7670) via Bluetooth.
 - **Automatic Photo Capture** - Takes photos automatically when motion is detected.
 - **Video Recording** - Manual video recording with one-tap control.
 - **Motion History** - Review all detected motion events with timestamps and photos.
@@ -58,6 +58,7 @@ A comprehensive Android home security application with motion detection, remote 
 ### Arduino Hardware Stack
 - **Microcontroller**: Arduino UNO (x2 - Main + Camera)
 - **Bluetooth Module**: HC-05
+- **Camera Module**: OV7670 (connected to UNO2)
 - **Sensors**: 
   - DHT11 Temperature & Humidity Sensor
   - HW-485 Sound Sensor
@@ -118,8 +119,8 @@ cd HomeSecurity
 - **Serial to UNO2**: TX→RX, RX→TX (115200 baud)
 
 **UNO2 (Camera Board):**
-- Camera module connection
-- Serial to UNO1 (115200 baud)
+- **OV7670 Camera**: Standard connection (VSYNC, HREF, PCLK, D0-D7, SDA, SCL).
+- **Serial to UNO1**: TX→RX, RX→TX (115200 baud) for image transfer.
 
 ## 📖 Usage
 
