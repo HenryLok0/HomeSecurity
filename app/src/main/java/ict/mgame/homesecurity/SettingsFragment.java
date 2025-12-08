@@ -280,11 +280,29 @@ public class SettingsFragment extends Fragment {
                 "Dark Mode"
         };
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
                 requireContext(),
                 R.layout.item_dropdown,
                 themeOptions
-        );
+        ) {
+            @NonNull
+            @Override
+            public android.widget.Filter getFilter() {
+                return new android.widget.Filter() {
+                    @Override
+                    protected FilterResults performFiltering(CharSequence constraint) {
+                        FilterResults results = new FilterResults();
+                        results.count = themeOptions.length;
+                        return results;
+                    }
+
+                    @Override
+                    protected void publishResults(CharSequence constraint, FilterResults results) {
+                        notifyDataSetChanged();
+                    }
+                };
+            }
+        };
         themeDropdown.setAdapter(adapter);
 
         // Load saved theme preference
