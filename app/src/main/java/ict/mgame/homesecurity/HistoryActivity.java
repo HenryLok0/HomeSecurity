@@ -44,7 +44,8 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        // Back button removed as per requirement
+        // getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         recyclerView = findViewById(R.id.recyclerView);
         tvEmpty = findViewById(R.id.tvEmpty);

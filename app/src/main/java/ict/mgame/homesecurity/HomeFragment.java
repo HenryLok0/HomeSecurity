@@ -11,6 +11,17 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Build;
+import androidx.core.app.NotificationCompat;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -36,6 +47,8 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     private ImageButton btnTakePhoto, btnRecordVideo, btnSwitchCamera;
 
     private boolean isPrivacyMode = false;
+    private long lastMotionTime = 0;
+    private static final long MOTION_COOLDOWN_MS = 5000; // 5 seconds cooldown
 
     @Nullable
     @Override
@@ -213,11 +226,73 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
 
     @Override
     public void onMotionDetected() {
+        long now = System.currentTimeMillis();
+        if (now - lastMotionTime < MOTION_COOLDOWN_MS) {
+            return;
+        }
+        lastMotionTime = now;
+
         new Handler(Looper.getMainLooper()).post(() -> {
             Toast.makeText(getContext(), "Motion Detected!", Toast.LENGTH_SHORT).show();
+            
+            // Take photo automatically
+            cameraManager.takePhoto(new CameraManager.OnPhotoSavedCallback() {
+                @Override
+                public void onPhotoSaved(String uri) {
+                    String msg = "Motion detected at " + new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+                    saveAlert(msg, uri);
+                    sendNotification(msg);
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    // Even if photo fails, save alert
+                    String msg = "Motion detected (Photo failed)";
+                    saveAlert(msg, null);
+                    sendNotification(msg);
+                }
+            });
+
             // Trigger alarm via BluetoothManager if needed
             // bluetoothManager.sendAlarmOn();
         });
+    }
+
+    private void saveAlert(String message, String uri) {
+        if (getContext() == null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
+        String json = prefs.getString(Constants.ALERTS_KEY, "[]");
+        try {
+            JSONArray arr = new JSONArray(json);
+            JSONObject obj = new JSONObject();
+            obj.put("message", message);
+            obj.put("time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+            obj.put("uri", uri);
+            arr.put(obj);
+            prefs.edit().putString(Constants.ALERTS_KEY, arr.toString()).apply();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendNotification(String message) {
+        if (getContext() == null) return;
+        NotificationManager notificationManager = (NotificationManager) requireContext().getSystemService(Context.NOTIFICATION_SERVICE);
+        String channelId = "motion_alert_channel";
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(channelId, "Motion Alerts", NotificationManager.IMPORTANCE_HIGH);
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(requireContext(), channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle("Motion Detected!")
+                .setContentText(message)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true);
+
+        notificationManager.notify((int) System.currentTimeMillis(), builder.build());
     }
     
     @Override

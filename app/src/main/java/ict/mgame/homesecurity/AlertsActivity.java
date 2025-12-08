@@ -39,10 +39,11 @@ public class AlertsActivity extends AppCompatActivity {
         if (toolbar != null) {
             setSupportActionBar(toolbar);
             if (getSupportActionBar() != null) {
-                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                // Back button removed as per requirement
+                // getSupportActionBar().setDisplayHomeAsUpEnabled(true);
                 getSupportActionBar().setTitle("Alerts");
             }
-            toolbar.setNavigationOnClickListener(v -> finish());
+            // toolbar.setNavigationOnClickListener(v -> finish());
         }
 
         rvAlerts = findViewById(R.id.rvAlerts);
@@ -167,17 +168,5 @@ public class AlertsActivity extends AppCompatActivity {
             Log.e(TAG, "Failed parse alerts", e);
         }
         return list;
-    }
-
-    public static class AlertItem {
-        public final String message;
-        public final String time;
-        public final String uri;
-
-        public AlertItem(String message, String time, String uri) {
-            this.message = message;
-            this.time = time;
-            this.uri = uri;
-        }
     }
 }

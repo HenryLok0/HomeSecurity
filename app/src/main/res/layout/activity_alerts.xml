@@ -16,9 +16,7 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/surface"
             app:title="Alerts"
-            app:titleTextColor="@color/text_primary"
-            app:navigationIcon="@android:drawable/ic_menu_revert"
-            app:navigationIconTint="@color/text_primary" />
+            app:titleTextColor="@color/text_primary" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView

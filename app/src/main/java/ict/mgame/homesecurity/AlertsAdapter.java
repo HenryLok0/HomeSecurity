@@ -14,17 +14,17 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
 public class AlertsAdapter extends RecyclerView.Adapter<AlertsAdapter.VH> {
-    private final List<AlertsActivity.AlertItem> items;
+    private final List<AlertItem> items;
     private final View.OnClickListener clickListener;
     private final Runnable selectionCallback;
     private boolean selectionMode = false;
     private final java.util.Set<Integer> selected = new java.util.HashSet<>();
 
-    public AlertsAdapter(List<AlertsActivity.AlertItem> items, View.OnClickListener clickListener) {
+    public AlertsAdapter(List<AlertItem> items, View.OnClickListener clickListener) {
         this(items, clickListener, null);
     }
 
-    public AlertsAdapter(List<AlertsActivity.AlertItem> items, View.OnClickListener clickListener, Runnable selectionCallback) {
+    public AlertsAdapter(List<AlertItem> items, View.OnClickListener clickListener, Runnable selectionCallback) {
         this.items = items;
         this.clickListener = clickListener;
         this.selectionCallback = selectionCallback;
@@ -39,7 +39,7 @@ public class AlertsAdapter extends RecyclerView.Adapter<AlertsAdapter.VH> {
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
-        AlertsActivity.AlertItem it = items.get(position);
+        AlertItem it = items.get(position);
         holder.tvMessage.setText(it.message);
         holder.tvTime.setText(it.time == null || it.time.isEmpty() ? "" : it.time);
         if (it.uri != null && !it.uri.isEmpty() && !it.uri.equals("null")) {

@@ -13,9 +13,15 @@ import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
@@ -27,7 +33,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     private static SettingsActivity instance; // Static reference for callbacks
 
-    private ListView lvBluetoothDevices;
+    private android.widget.LinearLayout llBluetoothList;
     private android.widget.LinearLayout layoutNoDevice;
     private TextInputEditText etNewPassword;
     private TextInputEditText etConfirmPassword;
@@ -47,9 +53,7 @@ public class SettingsActivity extends AppCompatActivity {
     private AutoCompleteTextView themeDropdown;
 
     private BluetoothAdapter bluetoothAdapter;
-    private ArrayList<String> deviceList;
     private ArrayList<BluetoothDevice> bluetoothDevices;
-    private ArrayAdapter<String> deviceAdapter;
 
     // Preferences Keys
     private static final String PREFS_NAME = "HomeSecurityPrefs";
@@ -71,7 +75,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         // Initialize Views
-        lvBluetoothDevices = findViewById(R.id.lvBluetoothDevices);
+        llBluetoothList = findViewById(R.id.llBluetoothList);
         layoutNoDevice = findViewById(R.id.layoutNoDevice);
         etNewPassword = findViewById(R.id.etNewPassword);
         etConfirmPassword = findViewById(R.id.etConfirmPassword);
@@ -102,22 +106,10 @@ public class SettingsActivity extends AppCompatActivity {
 
         // Initialize Bluetooth Adapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        deviceList = new ArrayList<>();
         bluetoothDevices = new ArrayList<>();
-        deviceAdapter = new ArrayAdapter<>(this, R.layout.item_bluetooth_device, android.R.id.text1, deviceList);
-        lvBluetoothDevices.setAdapter(deviceAdapter);
 
         // Load Bluetooth Devices
         loadConnectedBluetoothDevices();
-
-        // Set List Item Click Listener
-        lvBluetoothDevices.setOnItemClickListener((parent, view, position, id) -> {
-            BluetoothDevice device = bluetoothDevices.get(position);
-            android.content.Intent resultIntent = new android.content.Intent();
-            resultIntent.putExtra("device_address", device.getAddress());
-            setResult(RESULT_OK, resultIntent);
-            finish();
-        });
 
         // Set Reset Password Button Listener
         btnResetPassword.setOnClickListener(v -> resetPassword());
@@ -134,27 +126,57 @@ public class SettingsActivity extends AppCompatActivity {
             return;
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 100);
+                return;
+            }
+        }
+
         try {
-            // Note: In a real app, you need to handle runtime permissions for BLUETOOTH_CONNECT
             Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-            deviceList.clear();
             bluetoothDevices.clear();
+            llBluetoothList.removeAllViews();
 
             if (pairedDevices != null && !pairedDevices.isEmpty()) {
                 for (BluetoothDevice device : pairedDevices) {
-                    // Showing Name and Address
-                    deviceList.add(device.getName() + "\n" + device.getAddress());
                     bluetoothDevices.add(device);
+                    
+                    // Create item view
+                    View itemView = getLayoutInflater().inflate(R.layout.item_bluetooth_device, llBluetoothList, false);
+                    TextView tvDevice = itemView.findViewById(android.R.id.text1);
+                    tvDevice.setText(device.getName() + "\n" + device.getAddress());
+                    
+                    // Set click listener
+                    itemView.setOnClickListener(v -> {
+                        android.content.Intent resultIntent = new android.content.Intent();
+                        resultIntent.putExtra("device_address", device.getAddress());
+                        setResult(RESULT_OK, resultIntent);
+                        finish();
+                    });
+                    
+                    llBluetoothList.addView(itemView);
                 }
-                lvBluetoothDevices.setVisibility(View.VISIBLE);
+                llBluetoothList.setVisibility(View.VISIBLE);
                 layoutNoDevice.setVisibility(View.GONE);
             } else {
-                lvBluetoothDevices.setVisibility(View.GONE);
+                llBluetoothList.setVisibility(View.GONE);
                 layoutNoDevice.setVisibility(View.VISIBLE);
             }
-            deviceAdapter.notifyDataSetChanged();
         } catch (SecurityException e) {
             Toast.makeText(this, "Permission missing to scan Bluetooth devices", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 100) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                loadConnectedBluetoothDevices();
+            } else {
+                Toast.makeText(this, "Bluetooth permission denied", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -280,7 +302,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
             this,
-            android.R.layout.simple_dropdown_item_1line,
+            R.layout.item_dropdown,
             themeOptions
         );
         themeDropdown.setAdapter(adapter);
