@@ -1,19 +1,22 @@
 package ict.mgame.homesecurity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 
-import androidx.appcompat.widget.Toolbar;
-
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import android.view.MenuItem;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -23,31 +26,33 @@ import org.json.JSONException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AlertsActivity extends AppCompatActivity {
-    private static final String TAG = "AlertsActivity";
+public class AlertsFragment extends Fragment {
+    private static final String TAG = "AlertsFragment";
     private RecyclerView rvAlerts;
     private AlertsAdapter adapter;
     private List<AlertItem> items;
-    private Toolbar toolbar;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.activity_alerts, container, false);
+    }
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_alerts);
-        // Setup toolbar with Up (back) button like Gallery
-        Toolbar toolbar = findViewById(R.id.toolbarAlerts);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            if (getSupportActionBar() != null) {
-                // Back button removed as per requirement
-                // getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-                getSupportActionBar().setTitle("Alerts");
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        setHasOptionsMenu(true);
+
+        Toolbar toolbar = view.findViewById(R.id.toolbarAlerts);
+        if (getActivity() instanceof AppCompatActivity) {
+            ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
+            if (((AppCompatActivity) getActivity()).getSupportActionBar() != null) {
+                ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle("Alerts");
             }
-            // toolbar.setNavigationOnClickListener(v -> finish());
         }
 
-        rvAlerts = findViewById(R.id.rvAlerts);
-        rvAlerts.setLayoutManager(new LinearLayoutManager(this));
+        rvAlerts = view.findViewById(R.id.rvAlerts);
+        rvAlerts.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         items = loadAlertsFromPrefs();
         adapter = new AlertsAdapter(items, v -> {
@@ -55,24 +60,24 @@ public class AlertsActivity extends AppCompatActivity {
             int pos = rvAlerts.getChildAdapterPosition(v);
             if (pos >= 0 && pos < items.size()) {
                 AlertItem ai = items.get(pos);
-                Intent intent = new Intent(AlertsActivity.this, AlertDetailActivity.class);
+                Intent intent = new Intent(requireContext(), AlertDetailActivity.class);
                 intent.putExtra("message", ai.message);
                 intent.putExtra("time", ai.time);
                 intent.putExtra("uri", ai.uri);
                 startActivity(intent);
             }
-        }, () -> invalidateOptionsMenu());
+        }, () -> requireActivity().invalidateOptionsMenu());
         rvAlerts.setAdapter(adapter);
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_alerts, menu);
-        return true;
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_alerts, menu);
+        super.onCreateOptionsMenu(menu, inflater);
     }
 
     @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
+    public void onPrepareOptionsMenu(@NonNull Menu menu) {
         MenuItem delete = menu.findItem(R.id.action_delete);
         MenuItem select = menu.findItem(R.id.action_select);
         if (adapter != null && adapter.isSelectionMode()) {
@@ -82,16 +87,16 @@ public class AlertsActivity extends AppCompatActivity {
             select.setTitle("Select");
             delete.setVisible(false);
         }
-        return super.onPrepareOptionsMenu(menu);
+        super.onPrepareOptionsMenu(menu);
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.action_select) {
             boolean newMode = !adapter.isSelectionMode();
             adapter.setSelectionMode(newMode);
-            invalidateOptionsMenu();
+            requireActivity().invalidateOptionsMenu();
             return true;
         } else if (id == R.id.action_delete) {
             // confirm and delete selected
@@ -109,22 +114,22 @@ public class AlertsActivity extends AppCompatActivity {
                 int pos = rvAlerts.getChildAdapterPosition(v);
                 if (pos >= 0 && pos < items.size()) {
                     AlertItem ai = items.get(pos);
-                    Intent intent = new Intent(AlertsActivity.this, AlertDetailActivity.class);
+                    Intent intent = new Intent(requireContext(), AlertDetailActivity.class);
                     intent.putExtra("message", ai.message);
                     intent.putExtra("time", ai.time);
                     intent.putExtra("uri", ai.uri);
                     startActivity(intent);
                 }
-            }, () -> invalidateOptionsMenu());
+            }, () -> requireActivity().invalidateOptionsMenu());
             rvAlerts.setAdapter(adapter);
-            invalidateOptionsMenu();
+            requireActivity().invalidateOptionsMenu();
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
     private void deleteAlertsFromPrefs(java.util.List<AlertItem> toRemove) {
-        SharedPreferences prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = requireContext().getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
         String json = prefs.getString(Constants.ALERTS_KEY, null);
         if (json == null) return;
         try {
@@ -152,7 +157,7 @@ public class AlertsActivity extends AppCompatActivity {
 
     private List<AlertItem> loadAlertsFromPrefs() {
         List<AlertItem> list = new ArrayList<>();
-        SharedPreferences prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences prefs = requireContext().getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
         String json = prefs.getString(Constants.ALERTS_KEY, null);
         if (json == null) return list;
         try {

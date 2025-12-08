@@ -2,20 +2,23 @@ package ict.mgame.homesecurity;
 
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.MediaStore;
+import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -27,7 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-public class HistoryActivity extends AppCompatActivity implements HistoryAdapter.OnItemClickListener {
+public class HistoryFragment extends Fragment implements HistoryAdapter.OnItemClickListener {
 
     private RecyclerView recyclerView;
     private TextView tvEmpty;
@@ -37,27 +40,33 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
     private MenuItem menuShare;
     private MenuItem menuManage;
 
+    @Nullable
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_history);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.activity_history, container, false);
+    }
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        // Back button removed as per requirement
-        // getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        setHasOptionsMenu(true);
 
-        recyclerView = findViewById(R.id.recyclerView);
-        tvEmpty = findViewById(R.id.tvEmpty);
+        Toolbar toolbar = view.findViewById(R.id.toolbar);
+        if (getActivity() instanceof AppCompatActivity) {
+            ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
+        }
 
-        recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
+        recyclerView = view.findViewById(R.id.recyclerView);
+        tvEmpty = view.findViewById(R.id.tvEmpty);
+
+        recyclerView.setLayoutManager(new GridLayoutManager(requireContext(), 2));
 
         loadFiles();
     }
 
     private void loadFiles() {
         fileList = new ArrayList<>();
-        
+
         // Load from Pictures/HomeSecurity-Image
         File imageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "HomeSecurity-Image");
         if (imageDir.exists() && imageDir.isDirectory()) {
@@ -90,30 +99,27 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
         } else {
             tvEmpty.setVisibility(View.GONE);
             recyclerView.setVisibility(View.VISIBLE);
-            adapter = new HistoryAdapter(this, fileList, this);
+            adapter = new HistoryAdapter(requireContext(), fileList, this);
             recyclerView.setAdapter(adapter);
         }
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_history, menu);
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_history, menu);
         menuDelete = menu.findItem(R.id.action_delete);
         menuShare = menu.findItem(R.id.action_share);
         menuManage = menu.findItem(R.id.action_manage);
-        
+
         menuDelete.setVisible(false);
         menuShare.setVisible(false);
-        return true;
+        super.onCreateOptionsMenu(menu, inflater);
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-        if (id == android.R.id.home) {
-            finish();
-            return true;
-        } else if (id == R.id.action_manage) {
+        if (id == R.id.action_manage) {
             if (adapter != null) {
                 boolean newMode = !adapter.isSelectionMode();
                 adapter.setSelectionMode(newMode);
@@ -140,8 +146,8 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
         }
         adapter.removeFiles(deletedFiles);
         adapter.clearSelection();
-        Toast.makeText(this, "Deleted " + deletedFiles.size() + " files", Toast.LENGTH_SHORT).show();
-        
+        Toast.makeText(requireContext(), "Deleted " + deletedFiles.size() + " files", Toast.LENGTH_SHORT).show();
+
         if (adapter.getItemCount() == 0) {
             tvEmpty.setVisibility(View.VISIBLE);
             recyclerView.setVisibility(View.GONE);
@@ -150,23 +156,23 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
 
     private void shareSelectedFiles() {
         Set<File> selected = adapter.getSelectedFiles();
-        
+
         if (selected.isEmpty()) {
-            Toast.makeText(this, "No files selected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "No files selected", Toast.LENGTH_SHORT).show();
             return;
         }
-        
+
         try {
             ArrayList<Uri> uris = new ArrayList<>();
             for (File file : selected) {
                 if (file.exists()) {
-                    Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
+                    Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".provider", file);
                     uris.add(uri);
                 }
             }
-            
+
             if (uris.isEmpty()) {
-                Toast.makeText(this, "No valid files to share", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "No valid files to share", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -178,34 +184,34 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
                 shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
                 shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
             }
-            
+
             // Determine MIME type based on files
             String mimeType = "*/*";
             if (!selected.isEmpty()) {
                 File firstFile = selected.iterator().next();
                 if (firstFile.getName().toLowerCase().endsWith(".mp4")) {
                     mimeType = "video/*";
-                } else if (firstFile.getName().toLowerCase().endsWith(".jpg") || 
-                           firstFile.getName().toLowerCase().endsWith(".jpeg")) {
+                } else if (firstFile.getName().toLowerCase().endsWith(".jpg") ||
+                        firstFile.getName().toLowerCase().endsWith(".jpeg")) {
                     mimeType = "image/*";
                 }
             }
-            
+
             shareIntent.setType(mimeType);
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            
+
             startActivity(Intent.createChooser(shareIntent, "Share files via"));
             adapter.clearSelection();
-            
+
         } catch (Exception e) {
-            Toast.makeText(this, "Failed to share files: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(requireContext(), "Failed to share files: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
         }
     }
 
     @Override
     public void onItemClick(File file) {
-        Intent intent = new Intent(this, MediaViewerActivity.class);
+        Intent intent = new Intent(requireContext(), MediaViewerActivity.class);
         intent.putExtra("file_path", file.getAbsolutePath());
         startActivity(intent);
     }
@@ -221,16 +227,20 @@ public class HistoryActivity extends AppCompatActivity implements HistoryAdapter
         if (count > 0) {
             menuDelete.setVisible(true);
             menuShare.setVisible(true);
-            getSupportActionBar().setTitle(count + " selected");
+            if (getActivity() instanceof AppCompatActivity && ((AppCompatActivity) getActivity()).getSupportActionBar() != null) {
+                ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle(count + " selected");
+            }
         } else {
             menuDelete.setVisible(false);
             menuShare.setVisible(false);
-            getSupportActionBar().setTitle(isSelectionMode ? "Select items" : "History");
+            if (getActivity() instanceof AppCompatActivity && ((AppCompatActivity) getActivity()).getSupportActionBar() != null) {
+                ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle(isSelectionMode ? "Select items" : "History");
+            }
         }
     }
-    
+
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         loadFiles(); // Reload in case files were deleted in viewer
     }
