@@ -252,8 +252,8 @@ void handleBtCommand(char c) {
 
 // ========= setup & loop =========
 void setup() {
-  Serial.begin(115200);  // UNO2 串口
-  BT.begin(115200);      // HC-05 蓝牙 (必须设置为 115200 以匹配摄像头速度)
+  Serial.begin(115200);  // UNO2 串口（摄像头板），保持 115200
+  BT.begin(38400);       // HC-05 蓝牙，已经用 AT+UART=38400,0,0 设置过
 
   pinMode(buzzerPin, OUTPUT);
   pinMode(redPin, OUTPUT);
@@ -282,7 +282,7 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // 1) UNO2 -> 蓝牙
+  // 1) UNO2 -> 蓝牙（摄像头数据 & 调试信息）
   while (Serial.available()) {
     uint8_t b = Serial.read();
     BT.write(b);

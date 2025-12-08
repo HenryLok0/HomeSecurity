@@ -239,7 +239,7 @@ public class BluetoothManager {
             
             // Debug Log: Show how much data we have (helps to see if we are receiving anything)
             if (data.length > 0) {
-                // Log.d(TAG, "Processing buffer: " + data.length + " bytes");
+                Log.d(TAG, "Processing buffer: " + data.length + " bytes");
             }
 
             // 1. Check for Raw Binary Frame (AA 04 21 ...)
@@ -326,7 +326,7 @@ public class BluetoothManager {
                 } else {
                     // Incomplete frame, wait for more data
                     // Do NOT process as text
-                    // Log.d(TAG, "Incomplete frame: " + data.length + "/" + totalPacketSize);
+                    Log.d(TAG, "Incomplete frame: " + data.length + "/" + totalPacketSize);
                     return;
                 }
             }
