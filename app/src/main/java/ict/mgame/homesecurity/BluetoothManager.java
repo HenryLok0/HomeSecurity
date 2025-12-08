@@ -237,83 +237,171 @@ public class BluetoothManager {
             byte[] data = buffer.toByteArray();
             if (data.length == 0) return;
 
-            int start = -1;
-            for (int i = 0; i < data.length - 1; i++) {
-                if ((data[i] & 0xFF) == 0xFF && (data[i+1] & 0xFF) == 0xD8) {
-                    start = i;
+            // 1. Check for Raw Binary Frame (AA 04 21 ...)
+            // Header: AA 04 21 W H ... (Start, Len, Cmd, W, H)
+            int frameStart = -1;
+            for (int i = 0; i < data.length - 4; i++) {
+                if ((data[i] & 0xFF) == 0xAA && 
+                    (data[i+1] & 0xFF) == 0x04 && 
+                    (data[i+2] & 0xFF) == 0x21) {
+                    frameStart = i;
                     break;
                 }
             }
 
-            int textEnd = (start != -1) ? start : data.length;
-            if (textEnd > 0) {
-                byte[] textBytes = new byte[textEnd];
-                System.arraycopy(data, 0, textBytes, 0, textEnd);
-                String textChunk = new String(textBytes);
-                int lastNewline = textChunk.lastIndexOf('\n');
-                if (lastNewline >= 0) {
-                    String toProcess = textChunk.substring(0, lastNewline);
-                    String[] lines = toProcess.split("\\r?\\n");
+            if (frameStart != -1) {
+                // Found header!
+                // If there is data BEFORE the header, process it as text/garbage
+                if (frameStart > 0) {
+                    byte[] textBytes = new byte[frameStart];
+                    System.arraycopy(data, 0, textBytes, 0, frameStart);
+                    // Try to process as text
+                    String textChunk = new String(textBytes);
+                    String[] lines = textChunk.split("\\r?\\n");
                     for (String line : lines) {
-                        processTextLine(line.trim());
+                        if (!line.trim().isEmpty()) processTextLine(line.trim());
                     }
+                    
+                    // Remove the prefix and recurse
+                    int remainingLen = data.length - frameStart;
+                    byte[] remaining = new byte[remainingLen];
+                    System.arraycopy(data, frameStart, remaining, 0, remainingLen);
+                    buffer.reset();
+                    try { buffer.write(remaining); } catch (IOException e) {}
+                    processBuffer(buffer);
+                    return;
                 }
-            }
 
-            if (start != -1) {
-                int end = -1;
-                for (int j = start + 2; j < data.length - 1; j++) {
-                    if ((data[j] & 0xFF) == 0xFF && (data[j+1] & 0xFF) == 0xD9) {
-                        end = j + 1;
-                        break;
-                    }
-                }
+                // Frame starts at 0
+                int headerSize = 7;
+                int imageSize = 160 * 120; // 19200 bytes
+                int totalPacketSize = headerSize + imageSize;
 
-                if (end != -1) {
+                if (data.length >= totalPacketSize) {
+                    // We have the full frame
                     try {
-                        byte[] jpeg = new byte[end - start + 1];
-                        System.arraycopy(data, start, jpeg, 0, jpeg.length);
-                        final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                        int[] pixels = new int[imageSize];
+                        int dataStart = headerSize;
+                        
+                        for (int i = 0; i < imageSize; i++) {
+                            int gray = data[dataStart + i] & 0xFF;
+                            pixels[i] = 0xFF000000 | (gray << 16) | (gray << 8) | gray;
+                        }
+                        
+                        final Bitmap bmp = Bitmap.createBitmap(pixels, 160, 120, Bitmap.Config.ARGB_8888);
+                        
                         if (bmp != null && listener != null) {
                             new Handler(Looper.getMainLooper()).post(() -> {
                                 if (listener != null) listener.onImageReceived(bmp);
                             });
                         }
                     } catch (Exception e) {
-                        Log.w(TAG, "Failed to decode JPEG chunk", e);
+                        Log.w(TAG, "Failed to decode OV7670 frame", e);
                     }
 
-                    int remainingLen = data.length - (end + 1);
-                    byte[] remaining = new byte[remainingLen];
-                    System.arraycopy(data, end + 1, remaining, 0, remainingLen);
-                    buffer.reset();
-                    try { buffer.write(remaining); } catch (IOException e) {}
-                    processBuffer(buffer);
-                } else {
-                    int remainingLen = data.length - start;
-                    byte[] remaining = new byte[remainingLen];
-                    System.arraycopy(data, start, remaining, 0, remainingLen);
-                    buffer.reset();
-                    try { buffer.write(remaining); } catch (IOException e) {}
-                }
-            } else {
-                String textChunk = new String(data);
-                int lastNewline = textChunk.lastIndexOf('\n');
-                if (lastNewline >= 0) {
-                    int remainingLen = data.length - (lastNewline + 1);
+                    // Remove processed frame from buffer
+                    int consumed = totalPacketSize;
+                    int remainingLen = data.length - consumed;
                     if (remainingLen > 0) {
                         byte[] remaining = new byte[remainingLen];
-                        System.arraycopy(data, lastNewline + 1, remaining, 0, remainingLen);
+                        System.arraycopy(data, consumed, remaining, 0, remainingLen);
                         buffer.reset();
                         try { buffer.write(remaining); } catch (IOException e) {}
+                        processBuffer(buffer); // Process remaining data
                     } else {
                         buffer.reset();
                     }
+                    return;
+                } else {
+                    // Incomplete frame, wait for more data
+                    // Do NOT process as text
+                    return;
                 }
             }
 
-            if (buffer.size() > 500000) {
-                buffer.reset();
+            // 2. Check for JPEG (FF D8)
+            int jpegStart = -1;
+            for (int i = 0; i < data.length - 1; i++) {
+                if ((data[i] & 0xFF) == 0xFF && (data[i+1] & 0xFF) == 0xD8) {
+                    jpegStart = i;
+                    break;
+                }
+            }
+
+            if (jpegStart != -1) {
+                // Check for End (FF D9)
+                int jpegEnd = -1;
+                for (int j = jpegStart + 2; j < data.length - 1; j++) {
+                    if ((data[j] & 0xFF) == 0xFF && (data[j+1] & 0xFF) == 0xD9) {
+                        jpegEnd = j + 1;
+                        break;
+                    }
+                }
+
+                if (jpegEnd != -1) {
+                    // Found full JPEG
+                    try {
+                        int len = jpegEnd - jpegStart + 1;
+                        byte[] jpeg = new byte[len];
+                        System.arraycopy(data, jpegStart, jpeg, 0, len);
+                        final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, len);
+                        if (bmp != null && listener != null) {
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                if (listener != null) listener.onImageReceived(bmp);
+                            });
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "JPEG decode error", e);
+                    }
+                    
+                    // Remove processed JPEG
+                    int consumed = jpegEnd + 1;
+                    int remainingLen = data.length - consumed;
+                    if (remainingLen > 0) {
+                        byte[] remaining = new byte[remainingLen];
+                        System.arraycopy(data, consumed, remaining, 0, remainingLen);
+                        buffer.reset();
+                        try { buffer.write(remaining); } catch (IOException e) {}
+                        processBuffer(buffer);
+                    } else {
+                        buffer.reset();
+                    }
+                    return;
+                }
+                // Else: Found start but not end. Wait.
+                return;
+            }
+
+            // 3. Text Processing (Fallback)
+            // Only process if we are sure it's not a partial binary frame
+            // If buffer is very large and no frame found, it might be garbage, but we try to extract text.
+            
+            String textChunk = new String(data);
+            int lastNewline = textChunk.lastIndexOf('\n');
+            if (lastNewline >= 0) {
+                String toProcess = textChunk.substring(0, lastNewline);
+                String[] lines = toProcess.split("\\r?\\n");
+                for (String line : lines) {
+                    processTextLine(line.trim());
+                }
+                
+                // Remove processed text
+                int consumed = lastNewline + 1; // +1 for the newline
+                int remainingLen = data.length - consumed;
+                if (remainingLen > 0) {
+                    byte[] remaining = new byte[remainingLen];
+                    System.arraycopy(data, consumed, remaining, 0, remainingLen);
+                    buffer.reset();
+                    try { buffer.write(remaining); } catch (IOException e) {}
+                } else {
+                    buffer.reset();
+                }
+            } else {
+                // No newline found.
+                // If buffer is getting too big, clear it to prevent OOM
+                if (buffer.size() > 50000) {
+                    buffer.reset();
+                }
             }
         }
 
