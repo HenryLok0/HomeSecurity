@@ -118,6 +118,21 @@ public class SettingsFragment extends Fragment {
 
         // Set Reset Password Button Listener
         btnResetPassword.setOnClickListener(v -> resetPassword());
+
+        // Logout Button
+        Button btnLogout = view.findViewById(R.id.btnLogout);
+        btnLogout.setOnClickListener(v -> logout());
+    }
+
+    private void logout() {
+        // Clear login state
+        SharedPreferences prefs = requireContext().getSharedPreferences("UserPrefs", Context.MODE_PRIVATE);
+        prefs.edit().putBoolean("isLoggedIn", false).apply();
+
+        // Navigate to LoginActivity
+        android.content.Intent intent = new android.content.Intent(requireContext(), LoginActivity.class);
+        intent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
     }
 
     private void loadConnectedBluetoothDevices() {
