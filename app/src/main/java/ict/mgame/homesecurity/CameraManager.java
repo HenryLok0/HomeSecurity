@@ -148,7 +148,10 @@ public class CameraManager {
     }
 
     public void takePhoto(OnPhotoSavedCallback callback) {
-        if (imageCapture == null) return;
+        if (imageCapture == null) {
+            if (callback != null) callback.onError(new IllegalStateException("ImageCapture not initialized"));
+            return;
+        }
 
         String name = new SimpleDateFormat(FILENAME_FORMAT, Locale.US)
                 .format(System.currentTimeMillis());
@@ -165,26 +168,31 @@ public class CameraManager {
                 contentValues
         ).build();
 
-        imageCapture.takePicture(
-                outputOptions,
-                ContextCompat.getMainExecutor(context),
-                new ImageCapture.OnImageSavedCallback() {
-                    @Override
-                    public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
-                        if (callback != null) {
-                            callback.onPhotoSaved(outputFileResults.getSavedUri() != null ? outputFileResults.getSavedUri().toString() : null);
+        try {
+            imageCapture.takePicture(
+                    outputOptions,
+                    ContextCompat.getMainExecutor(context),
+                    new ImageCapture.OnImageSavedCallback() {
+                        @Override
+                        public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                            if (callback != null) {
+                                callback.onPhotoSaved(outputFileResults.getSavedUri() != null ? outputFileResults.getSavedUri().toString() : null);
+                            }
                         }
-                    }
 
-                    @Override
-                    public void onError(@NonNull ImageCaptureException exception) {
-                        Log.e(TAG, "Photo capture failed: " + exception.getMessage(), exception);
-                        if (callback != null) {
-                            callback.onError(exception);
+                        @Override
+                        public void onError(@NonNull ImageCaptureException exception) {
+                            Log.e(TAG, "Photo capture failed: " + exception.getMessage(), exception);
+                            if (callback != null) {
+                                callback.onError(exception);
+                            }
                         }
                     }
-                }
-        );
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to take picture", e);
+            if (callback != null) callback.onError(e);
+        }
     }
 
     public interface OnPhotoSavedCallback {

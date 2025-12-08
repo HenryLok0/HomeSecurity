@@ -156,7 +156,9 @@ public class SettingsFragment extends Fragment {
                     itemView.setOnClickListener(v -> {
                         // Connect to the device
                         BluetoothManager.getInstance().connect(device.getAddress());
-                        Toast.makeText(requireContext(), "Connecting to " + device.getName(), Toast.LENGTH_SHORT).show();
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(requireContext(), "Connecting to " + device.getName(), Toast.LENGTH_SHORT).show();
+                        }
                     });
 
                     llBluetoothList.addView(itemView);

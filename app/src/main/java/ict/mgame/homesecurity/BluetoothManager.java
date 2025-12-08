@@ -57,21 +57,44 @@ public class BluetoothManager {
 
     public void connect(String address) {
         if (bluetoothAdapter == null) return;
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-        connect(device);
+        try {
+            BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
+            connect(device);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Invalid address: " + address, e);
+            if (listener != null) {
+                listener.onConnectionFailed();
+            }
+        }
     }
 
     public void connect(BluetoothDevice device) {
         new Thread(() -> {
             try {
                 // Note: Permission check should be done before calling this
-                bluetoothSocket = device.createRfcommSocketToServiceRecord(MY_UUID);
-                bluetoothAdapter.cancelDiscovery();
-                bluetoothSocket.connect();
+                try {
+                    bluetoothSocket = device.createRfcommSocketToServiceRecord(MY_UUID);
+                    bluetoothAdapter.cancelDiscovery();
+                    bluetoothSocket.connect();
+                } catch (SecurityException se) {
+                    Log.e(TAG, "Permission missing during connection", se);
+                    if (listener != null) {
+                        new Handler(Looper.getMainLooper()).post(() -> listener.onConnectionFailed());
+                    }
+                    return;
+                }
 
                 isConnected = true;
                 if (listener != null) {
-                    new Handler(Looper.getMainLooper()).post(() -> listener.onConnected(device.getName()));
+                    // device.getName() might throw SecurityException too
+                    String name = "Unknown Device";
+                    try {
+                        name = device.getName();
+                    } catch (SecurityException e) {
+                        Log.w(TAG, "Cannot get device name", e);
+                    }
+                    String finalName = name;
+                    new Handler(Looper.getMainLooper()).post(() -> listener.onConnected(finalName));
                 }
 
                 connectedThread = new ConnectedThread(bluetoothSocket);

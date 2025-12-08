@@ -216,18 +216,21 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
 
     @Override
     public void onConnected(String deviceName) {
+        if (!isAdded() || getContext() == null) return;
         updateBluetoothStatus(true);
         Toast.makeText(getContext(), "Connected to " + deviceName, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onConnectionFailed() {
+        if (!isAdded() || getContext() == null) return;
         updateBluetoothStatus(false);
         Toast.makeText(getContext(), "Bluetooth Connection Failed", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onDisconnected() {
+        if (!isAdded() || getContext() == null) return;
         updateBluetoothStatus(false);
         Toast.makeText(getContext(), "Bluetooth Disconnected", Toast.LENGTH_SHORT).show();
     }
@@ -288,12 +291,14 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         lastMotionTime = now;
 
         new Handler(Looper.getMainLooper()).post(() -> {
+            if (!isAdded() || getContext() == null) return;
             Toast.makeText(getContext(), "Motion Detected!", Toast.LENGTH_SHORT).show();
             
             // Take photo automatically
             cameraManager.takePhoto(new CameraManager.OnPhotoSavedCallback() {
                 @Override
                 public void onPhotoSaved(String uri) {
+                    if (!isAdded() || getContext() == null) return;
                     String msg = "Motion detected at " + new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
                     saveAlert(msg, uri);
                     sendNotification(msg);
@@ -301,6 +306,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
 
                 @Override
                 public void onError(Exception e) {
+                    if (!isAdded() || getContext() == null) return;
                     // Even if photo fails, save alert
                     String msg = "Motion detected (Photo failed)";
                     saveAlert(msg, null);
@@ -359,5 +365,6 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     public void onDestroyView() {
         super.onDestroyView();
         cameraManager.shutdown();
+        bluetoothManager.setListener(null);
     }
 }
