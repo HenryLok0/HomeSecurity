@@ -44,6 +44,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     private TextView tvTemp, tvHumidity, tvLight, tvSound, tvBluetoothStatus;
     private MaterialButton btnMotionSensor, btnPrivacyMode, btnBackgroundService;
     private View privacyOverlay;
+    private View layoutConnecting;
     private ImageButton btnTakePhoto, btnRecordVideo, btnSwitchCamera, btnSourceSwitch;
 
     private boolean isPrivacyMode = false;
@@ -72,6 +73,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         btnBackgroundService = view.findViewById(R.id.btnBackgroundService);
         btnPrivacyMode = view.findViewById(R.id.btnPrivacyMode);
         privacyOverlay = view.findViewById(R.id.privacyOverlay);
+        layoutConnecting = view.findViewById(R.id.layoutConnecting);
         btnTakePhoto = view.findViewById(R.id.btnTakePhoto);
         btnRecordVideo = view.findViewById(R.id.btnRecordVideo);
         btnSwitchCamera = view.findViewById(R.id.btnSwitchCamera);
@@ -88,6 +90,12 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         
         if (!isPrivacyMode) {
             cameraManager.startCamera();
+        }
+        
+        if (bluetoothManager.isConnecting()) {
+            layoutConnecting.setVisibility(View.VISIBLE);
+        } else {
+            layoutConnecting.setVisibility(View.GONE);
         }
         
         updateBluetoothStatus(bluetoothManager.isConnected());
@@ -215,8 +223,15 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     }
 
     @Override
+    public void onConnecting() {
+        if (!isAdded() || getContext() == null) return;
+        layoutConnecting.setVisibility(View.VISIBLE);
+    }
+
+    @Override
     public void onConnected(String deviceName) {
         if (!isAdded() || getContext() == null) return;
+        layoutConnecting.setVisibility(View.GONE);
         updateBluetoothStatus(true);
         Toast.makeText(getContext(), "Connected to " + deviceName, Toast.LENGTH_SHORT).show();
     }
@@ -224,6 +239,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     @Override
     public void onConnectionFailed() {
         if (!isAdded() || getContext() == null) return;
+        layoutConnecting.setVisibility(View.GONE);
         updateBluetoothStatus(false);
         Toast.makeText(getContext(), "Bluetooth Connection Failed", Toast.LENGTH_SHORT).show();
     }
@@ -231,6 +247,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     @Override
     public void onDisconnected() {
         if (!isAdded() || getContext() == null) return;
+        layoutConnecting.setVisibility(View.GONE);
         updateBluetoothStatus(false);
         Toast.makeText(getContext(), "Bluetooth Disconnected", Toast.LENGTH_SHORT).show();
     }

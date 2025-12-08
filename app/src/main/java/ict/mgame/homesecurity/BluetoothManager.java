@@ -26,8 +26,10 @@ public class BluetoothManager {
     private ConnectedThread connectedThread;
     private BluetoothListener listener;
     private boolean isConnected = false;
+    private boolean isConnecting = false;
 
     public interface BluetoothListener {
+        void onConnecting();
         void onConnected(String deviceName);
         void onConnectionFailed();
         void onDisconnected();
@@ -69,6 +71,10 @@ public class BluetoothManager {
     }
 
     public void connect(BluetoothDevice device) {
+        isConnecting = true;
+        if (listener != null) {
+            new Handler(Looper.getMainLooper()).post(() -> listener.onConnecting());
+        }
         new Thread(() -> {
             try {
                 // Note: Permission check should be done before calling this
@@ -78,6 +84,7 @@ public class BluetoothManager {
                     bluetoothSocket.connect();
                 } catch (SecurityException se) {
                     Log.e(TAG, "Permission missing during connection", se);
+                    isConnecting = false;
                     if (listener != null) {
                         new Handler(Looper.getMainLooper()).post(() -> listener.onConnectionFailed());
                     }
@@ -85,6 +92,7 @@ public class BluetoothManager {
                 }
 
                 isConnected = true;
+                isConnecting = false;
                 if (listener != null) {
                     // device.getName() might throw SecurityException too
                     String name = "Unknown Device";
@@ -103,6 +111,7 @@ public class BluetoothManager {
             } catch (IOException e) {
                 Log.e(TAG, "Connection failed", e);
                 isConnected = false;
+                isConnecting = false;
                 if (listener != null) {
                     new Handler(Looper.getMainLooper()).post(() -> listener.onConnectionFailed());
                 }
@@ -128,6 +137,10 @@ public class BluetoothManager {
 
     public boolean isConnected() {
         return isConnected;
+    }
+
+    public boolean isConnecting() {
+        return isConnecting;
     }
 
     public void sendAlarmOn() {

@@ -158,6 +158,15 @@ public class SettingsFragment extends Fragment {
                         BluetoothManager.getInstance().connect(device.getAddress());
                         if (isAdded() && getContext() != null) {
                             Toast.makeText(requireContext(), "Connecting to " + device.getName(), Toast.LENGTH_SHORT).show();
+                            
+                            // Navigate to HomeFragment
+                            if (getActivity() instanceof MainActivity) {
+                                com.google.android.material.bottomnavigation.BottomNavigationView bottomNav = 
+                                    getActivity().findViewById(R.id.bottom_navigation);
+                                if (bottomNav != null) {
+                                    bottomNav.setSelectedItemId(R.id.nav_home);
+                                }
+                            }
                         }
                     });
 
