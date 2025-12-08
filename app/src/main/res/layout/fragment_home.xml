@@ -50,6 +50,18 @@
                 app:layout_constraintTop_toBottomOf="@id/tvHeaderTitle"
                 android:layout_marginTop="4dp"/>
 
+            <TextView
+                android:id="@+id/tvBluetoothStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bluetooth: Disconnected"
+                android:textColor="@android:color/holo_red_dark"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvSubtitle"/>
+
             <!-- Camera Section -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardCamera"
@@ -119,6 +131,15 @@
                             android:background="?attr/selectableItemBackgroundBorderless"
                             app:tint="@color/white"
                             android:contentDescription="Switch Camera"/>
+
+                        <ImageButton
+                            android:id="@+id/btnSourceSwitch"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@android:drawable/ic_menu_slideshow"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            app:tint="@color/white"
+                            android:contentDescription="Switch Source"/>
                     </LinearLayout>
 
                     <!-- Privacy Overlay -->

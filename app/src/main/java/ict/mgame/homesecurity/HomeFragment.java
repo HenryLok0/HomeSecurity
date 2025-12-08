@@ -41,12 +41,13 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
     
     private PreviewView viewFinder;
     private ImageView remoteCameraView;
-    private TextView tvTemp, tvHumidity, tvLight, tvSound;
+    private TextView tvTemp, tvHumidity, tvLight, tvSound, tvBluetoothStatus;
     private MaterialButton btnMotionSensor, btnPrivacyMode, btnBackgroundService;
     private View privacyOverlay;
-    private ImageButton btnTakePhoto, btnRecordVideo, btnSwitchCamera;
+    private ImageButton btnTakePhoto, btnRecordVideo, btnSwitchCamera, btnSourceSwitch;
 
     private boolean isPrivacyMode = false;
+    private boolean isRemoteCameraActive = false;
     private long lastMotionTime = 0;
     private static final long MOTION_COOLDOWN_MS = 5000; // 5 seconds cooldown
 
@@ -66,6 +67,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         tvHumidity = view.findViewById(R.id.tvHumidity);
         tvLight = view.findViewById(R.id.tvLight);
         tvSound = view.findViewById(R.id.tvSound);
+        tvBluetoothStatus = view.findViewById(R.id.tvBluetoothStatus);
         btnMotionSensor = view.findViewById(R.id.btnMotionSensor);
         btnBackgroundService = view.findViewById(R.id.btnBackgroundService);
         btnPrivacyMode = view.findViewById(R.id.btnPrivacyMode);
@@ -73,6 +75,7 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         btnTakePhoto = view.findViewById(R.id.btnTakePhoto);
         btnRecordVideo = view.findViewById(R.id.btnRecordVideo);
         btnSwitchCamera = view.findViewById(R.id.btnSwitchCamera);
+        btnSourceSwitch = view.findViewById(R.id.btnSourceSwitch);
 
         bluetoothManager = BluetoothManager.getInstance();
         bluetoothManager.setListener(this);
@@ -85,6 +88,42 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         
         if (!isPrivacyMode) {
             cameraManager.startCamera();
+        }
+        
+        updateBluetoothStatus(bluetoothManager.isConnected());
+    }
+
+    private void updateBluetoothStatus(boolean connected) {
+        if (tvBluetoothStatus == null) return;
+
+        // Update Button Visibility
+        if (btnSourceSwitch != null) {
+            btnSourceSwitch.setVisibility(connected ? View.VISIBLE : View.GONE);
+        }
+
+        if (connected) {
+            tvBluetoothStatus.setText("Bluetooth: Connected");
+            tvBluetoothStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.success));
+            tvBluetoothStatus.clearAnimation();
+            tvBluetoothStatus.setAlpha(1.0f);
+        } else {
+            tvBluetoothStatus.setText("Bluetooth: Disconnected");
+            tvBluetoothStatus.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_red_dark));
+            
+            // Blinking animation
+            android.animation.ObjectAnimator animator = android.animation.ObjectAnimator.ofFloat(tvBluetoothStatus, "alpha", 1.0f, 0.3f);
+            animator.setDuration(1000);
+            animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            animator.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            animator.start();
+
+            // Reset to local camera if disconnected
+            if (isRemoteCameraActive) {
+                isRemoteCameraActive = false;
+                viewFinder.setVisibility(View.VISIBLE);
+                remoteCameraView.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Bluetooth Disconnected - Switched to Phone Camera", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -150,6 +189,19 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         }));
 
         btnSwitchCamera.setOnClickListener(v -> cameraManager.switchCamera());
+
+        btnSourceSwitch.setOnClickListener(v -> {
+            isRemoteCameraActive = !isRemoteCameraActive;
+            if (isRemoteCameraActive) {
+                viewFinder.setVisibility(View.GONE);
+                remoteCameraView.setVisibility(View.VISIBLE);
+                Toast.makeText(getContext(), "Switched to Remote Camera", Toast.LENGTH_SHORT).show();
+            } else {
+                viewFinder.setVisibility(View.VISIBLE);
+                remoteCameraView.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Switched to Phone Camera", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void updateMotionButton(boolean enabled) {
@@ -164,17 +216,20 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
 
     @Override
     public void onConnected(String deviceName) {
-        // Handle connection UI updates if needed
+        updateBluetoothStatus(true);
+        Toast.makeText(getContext(), "Connected to " + deviceName, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onConnectionFailed() {
+        updateBluetoothStatus(false);
         Toast.makeText(getContext(), "Bluetooth Connection Failed", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onDisconnected() {
-        // Handle disconnection
+        updateBluetoothStatus(false);
+        Toast.makeText(getContext(), "Bluetooth Disconnected", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -253,8 +308,13 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
                 }
             });
 
-            // Trigger alarm via BluetoothManager if needed
-            // bluetoothManager.sendAlarmOn();
+            // Trigger alarm via BluetoothManager
+            if (bluetoothManager.isConnected()) {
+                bluetoothManager.write("a");
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    bluetoothManager.write("x");
+                }, 3000);
+            }
         });
     }
 
