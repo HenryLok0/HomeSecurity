@@ -36,6 +36,11 @@
     </style>
 
     <style name="Theme.HomeSecurity" parent="Base.Theme.HomeSecurity" />
+
+    <style name="Theme.HomeSecurity.NoActionBar" parent="Theme.HomeSecurity">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
     
     <!-- Shape Appearances -->
     <style name="ShapeAppearance.HomeSecurity.SmallComponent" parent="ShapeAppearance.Material3.SmallComponent">

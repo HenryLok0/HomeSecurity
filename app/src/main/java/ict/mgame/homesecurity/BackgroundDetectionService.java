@@ -18,7 +18,7 @@ public class BackgroundDetectionService extends Service {
     private static final String CHANNEL_ID = "background_detection_channel";
     private static final int NOTIFICATION_ID = 1001;
     
-    private static boolean isServiceRunning = false;
+    public static boolean isServiceRunning = false;
     private PowerManager.WakeLock wakeLock;
 
     @Override

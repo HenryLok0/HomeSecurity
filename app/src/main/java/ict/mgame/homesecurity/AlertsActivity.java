@@ -123,8 +123,8 @@ public class AlertsActivity extends AppCompatActivity {
     }
 
     private void deleteAlertsFromPrefs(java.util.List<AlertItem> toRemove) {
-        SharedPreferences prefs = getSharedPreferences(MainActivity.PREFS_NAME, MODE_PRIVATE);
-        String json = prefs.getString(MainActivity.ALERTS_KEY, null);
+        SharedPreferences prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE);
+        String json = prefs.getString(Constants.ALERTS_KEY, null);
         if (json == null) return;
         try {
             JSONArray arr = new JSONArray(json);
@@ -143,7 +143,7 @@ public class AlertsActivity extends AppCompatActivity {
                 }
                 if (!match) out.put(obj);
             }
-            prefs.edit().putString(MainActivity.ALERTS_KEY, out.toString()).apply();
+            prefs.edit().putString(Constants.ALERTS_KEY, out.toString()).apply();
         } catch (JSONException e) {
             Log.e(TAG, "Failed to delete alerts", e);
         }
@@ -151,8 +151,8 @@ public class AlertsActivity extends AppCompatActivity {
 
     private List<AlertItem> loadAlertsFromPrefs() {
         List<AlertItem> list = new ArrayList<>();
-        SharedPreferences prefs = getSharedPreferences(MainActivity.PREFS_NAME, MODE_PRIVATE);
-        String json = prefs.getString(MainActivity.ALERTS_KEY, null);
+        SharedPreferences prefs = getSharedPreferences(Constants.PREFS_NAME, MODE_PRIVATE);
+        String json = prefs.getString(Constants.ALERTS_KEY, null);
         if (json == null) return list;
         try {
             JSONArray arr = new JSONArray(json);

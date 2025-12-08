@@ -34,6 +34,10 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.HomeSecurity.NoActionBar"/>
+        <activity
             android:name=".MainActivity"
             android:exported="false" />
         <activity

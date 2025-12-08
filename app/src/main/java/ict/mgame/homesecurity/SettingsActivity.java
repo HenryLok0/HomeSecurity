@@ -3,24 +3,20 @@ package ict.mgame.homesecurity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.widget.TextView;
-import android.widget.Button;
-import java.util.Locale;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.content.ContextCompat;
 
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -36,27 +32,17 @@ public class SettingsActivity extends AppCompatActivity {
     private TextInputEditText etNewPassword;
     private TextInputEditText etConfirmPassword;
     private Button btnResetPassword;
-    // DHT11 UI
-    private TextView tvTemperature;
-    private TextView tvHumidity;
-    private Button btnRefreshDht;
-    // Sound Sensor UI
-    private com.google.android.material.switchmaterial.SwitchMaterial switchSoundMonitor;
-    private TextView tvSoundRaw;
-    private TextView tvSoundPercent;
-    private TextView tvSoundThresholdLabel;
-    private android.widget.SeekBar seekSoundThreshold;
-    // Light Sensor UI
-    private TextView tvLightPercent;
-    private Button btnRefreshLight;
+    
+    // Update Interval UI
+    private SeekBar seekUpdateInterval;
+    private TextView tvUpdateIntervalLabel;
+    
     // Alarm Test UI
     private Button btnStartBuzzer;
     private Button btnStopBuzzer;
     // Buzzer Alarm Switch
     private SwitchMaterial switchBuzzerAlarm;
-    // Background Service UI
-    private MaterialButton btnBackgroundService;
-    private TextView tvBackgroundStatus;
+    
     // Theme UI
     private AutoCompleteTextView themeDropdown;
 
@@ -64,6 +50,11 @@ public class SettingsActivity extends AppCompatActivity {
     private ArrayList<String> deviceList;
     private ArrayList<BluetoothDevice> bluetoothDevices;
     private ArrayAdapter<String> deviceAdapter;
+
+    // Preferences Keys
+    private static final String PREFS_NAME = "HomeSecurityPrefs";
+    private static final String KEY_BUZZER_ALARM = "buzzer_alarm_enabled";
+    private static final String KEY_UPDATE_INTERVAL = "update_interval_ms";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,20 +77,9 @@ public class SettingsActivity extends AppCompatActivity {
         etConfirmPassword = findViewById(R.id.etConfirmPassword);
         btnResetPassword = findViewById(R.id.btnResetPassword);
 
-        // DHT11 Views
-        tvTemperature = findViewById(R.id.tvTemperature);
-        tvHumidity = findViewById(R.id.tvHumidity);
-        btnRefreshDht = findViewById(R.id.btnRefreshDht);
-        // Sound Sensor Views
-        switchSoundMonitor = findViewById(R.id.switchSoundMonitor);
-        tvSoundRaw = findViewById(R.id.tvSoundRaw);
-        tvSoundPercent = findViewById(R.id.tvSoundPercent);
-        tvSoundThresholdLabel = findViewById(R.id.tvSoundThresholdLabel);
-        seekSoundThreshold = findViewById(R.id.seekSoundThreshold);
-        
-        // Light Sensor Views
-        tvLightPercent = findViewById(R.id.tvLightPercent);
-        btnRefreshLight = findViewById(R.id.btnRefreshLight);
+        // Update Interval Views
+        seekUpdateInterval = findViewById(R.id.seekUpdateInterval);
+        tvUpdateIntervalLabel = findViewById(R.id.tvUpdateIntervalLabel);
         
         // Alarm Test Views
         btnStartBuzzer = findViewById(R.id.btnStartBuzzer);
@@ -109,26 +89,12 @@ public class SettingsActivity extends AppCompatActivity {
         switchBuzzerAlarm = findViewById(R.id.switchBuzzerAlarm);
         setupBuzzerAlarmSwitch();
 
-        // Background Service Views
-        btnBackgroundService = findViewById(R.id.btnBackgroundService);
-        tvBackgroundStatus = findViewById(R.id.tvBackgroundStatus);
-        setupBackgroundService();
-
         // Theme Dropdown
         themeDropdown = findViewById(R.id.themeDropdown);
         setupThemeDropdown();
 
-        // Load saved DHT values
-        loadDhtValuesToUI();
-        // Load saved Sound values
-        loadSoundValuesToUI();
-        // Load saved Light values
-        loadLightValuesToUI();
-
-        btnRefreshDht.setOnClickListener(v -> requestDhtData());
-        btnRefreshLight.setOnClickListener(v -> requestLightData());
-        // Setup Sound Sensor controls
-        setupSoundSensorControls();
+        // Setup Update Interval Control
+        setupUpdateIntervalControl();
         
         // Alarm Test Listeners
         btnStartBuzzer.setOnClickListener(v -> sendAlarmCommand('a'));
@@ -154,12 +120,7 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         // Set Reset Password Button Listener
-        btnResetPassword.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                resetPassword();
-            }
-        });
+        btnResetPassword.setOnClickListener(v -> resetPassword());
     }
 
     private void loadConnectedBluetoothDevices() {
@@ -220,58 +181,10 @@ public class SettingsActivity extends AppCompatActivity {
         etConfirmPassword.setText("");
     }
 
-    // DHT11 persistence keys
-    private static final String PREFS_NAME = "HomeSecurityPrefs";
-    private static final String KEY_DHT_TEMP = "dht_temp";
-    private static final String KEY_DHT_HUM = "dht_humidity";
-    private static final String KEY_BUZZER_ALARM = "buzzer_alarm_enabled";
-    // Sound sensor keys
-    private static final String KEY_SOUND_ENABLED = "sound_monitor_enabled";
-    private static final String KEY_SOUND_THRESHOLD = "sound_threshold_percent";
-    private static final String KEY_SOUND_RAW = "sound_raw";
-    private static final String KEY_SOUND_PERCENT = "sound_percent";
-    // Light sensor keys
-    private static final String KEY_LIGHT_RAW = "light_raw";
-    private static final String KEY_LIGHT_PERCENT = "light_percent";
-
-    private void loadDhtValuesToUI() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        float temp = prefs.getFloat(KEY_DHT_TEMP, Float.NaN);
-        float hum = prefs.getFloat(KEY_DHT_HUM, Float.NaN);
-        if (!Float.isNaN(temp)) {
-            tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
-        } else {
-            tvTemperature.setText("-- °C");
-        }
-        if (!Float.isNaN(hum)) {
-            tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", hum));
-        } else {
-            tvHumidity.setText("-- %");
-        }
-    }
-
-    public static void saveDhtValues(Context ctx, float temp, float humidity) {
-        try {
-            SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            prefs.edit().putFloat(KEY_DHT_TEMP, temp).putFloat(KEY_DHT_HUM, humidity).apply();
-        } catch (Exception e) {
-            // ignore
-        }
-    }
-
-    // Optional: call this from activity instance when live update arrives
-    public void onDhtUpdate(float temp, float humidity) {
-        saveDhtValues(this, temp, humidity);
-        runOnUiThread(() -> {
-            tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
-            tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", humidity));
-        });
-    }
-    
     private void sendAlarmCommand(char command) {
-        // Send command to MainActivity via static method
-        boolean sent = MainActivity.sendBluetoothCommand(command);
-        if (sent) {
+        // Send command to Arduino via BluetoothManager
+        if (BluetoothManager.getInstance().isConnected()) {
+            BluetoothManager.getInstance().write(String.valueOf(command));
             String action = (command == 'a') ? "Start" : "Stop";
             Toast.makeText(this, action + " buzzer command sent", Toast.LENGTH_SHORT).show();
         } else {
@@ -279,112 +192,16 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
     
-    private void requestDhtData() {
-        // Request DHT11 data from Arduino
-        boolean sent = MainActivity.sendBluetoothCommand('t');
-        if (sent) {
-            Toast.makeText(this, "Requesting temperature & humidity data...", Toast.LENGTH_SHORT).show();
-            // Data will be updated automatically when Arduino responds
-            // The response is parsed in MainActivity's ConnectedThread and saved via saveDhtValues()
-            // UI will be updated after a short delay
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                loadDhtValuesToUI();
-            }, 1000); // Wait 1 second for Arduino to respond
-        } else {
-            Toast.makeText(this, "Not connected to Arduino. Showing last saved data.", Toast.LENGTH_LONG).show();
-            loadDhtValuesToUI();
-        }
-    }
-
-    private void requestLightData() {
-        // Request Light data from Arduino
-        boolean sent = MainActivity.sendBluetoothCommand('l');
-        if (sent) {
-            Toast.makeText(this, "Requesting light sensor data...", Toast.LENGTH_SHORT).show();
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                loadLightValuesToUI();
-            }, 1000);
-        } else {
-            Toast.makeText(this, "Not connected to Arduino. Showing last saved data.", Toast.LENGTH_LONG).show();
-            loadLightValuesToUI();
-        }
-    }
-    
-    // Static method to update UI from MainActivity when DHT data is received
-    public static void notifyDhtDataReceived(float temp, float humidity) {
-        if (instance != null) {
-            instance.runOnUiThread(() -> {
-                instance.tvTemperature.setText(String.format(Locale.getDefault(), "%.1f °C", temp));
-                instance.tvHumidity.setText(String.format(Locale.getDefault(), "%.0f %%", humidity));
-            });
-        }
-    }
-    
     @Override
     protected void onDestroy() {
         super.onDestroy();
         instance = null; // Clear static reference
-        // Stop sound polling to avoid leaks
-        stopSoundPolling();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        updateBackgroundServiceUI();
-        // Resume sound polling if monitoring is enabled
-        if (switchSoundMonitor != null && switchSoundMonitor.isChecked()) {
-            startSoundPolling();
-        }
     }
 
     @Override
     public boolean onSupportNavigateUp() {
         finish();
         return true;
-    }
-
-    private void setupBackgroundService() {
-        updateBackgroundServiceUI();
-        
-        btnBackgroundService.setOnClickListener(v -> {
-            if (BackgroundDetectionService.isRunning()) {
-                // Stop service
-                Intent serviceIntent = new Intent(this, BackgroundDetectionService.class);
-                stopService(serviceIntent);
-                Toast.makeText(this, "Background detection stopped", Toast.LENGTH_SHORT).show();
-            } else {
-                // Start service
-                Intent serviceIntent = new Intent(this, BackgroundDetectionService.class);
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    startForegroundService(serviceIntent);
-                } else {
-                    startService(serviceIntent);
-                }
-                Toast.makeText(this, "Background detection started", Toast.LENGTH_SHORT).show();
-            }
-            
-            // Update UI after a short delay
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                updateBackgroundServiceUI();
-            }, 500);
-        });
-    }
-
-    private void updateBackgroundServiceUI() {
-        boolean isRunning = BackgroundDetectionService.isRunning();
-        
-        if (isRunning) {
-            btnBackgroundService.setText("Stop Background Detection");
-            btnBackgroundService.setIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_media_pause));
-            tvBackgroundStatus.setText("Status: Running");
-            tvBackgroundStatus.setTextColor(ContextCompat.getColor(this, R.color.success));
-        } else {
-            btnBackgroundService.setText("Start Background Detection");
-            btnBackgroundService.setIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_media_play));
-            tvBackgroundStatus.setText("Status: Stopped");
-            tvBackgroundStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
-        }
     }
 
     private void setupBuzzerAlarmSwitch() {
@@ -401,142 +218,57 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
-    // ---------- Sound Sensor helpers ----------
-    private void loadSoundValuesToUI() {
+    private void setupUpdateIntervalControl() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        int raw = prefs.getInt(KEY_SOUND_RAW, -1);
-        int percent = prefs.getInt(KEY_SOUND_PERCENT, -1);
-        int threshold = prefs.getInt(KEY_SOUND_THRESHOLD, 50);
-        boolean enabled = prefs.getBoolean(KEY_SOUND_ENABLED, false);
+        // Default 300ms (0.3s)
+        long savedInterval = prefs.getLong(KEY_UPDATE_INTERVAL, 300);
+        
+        // SeekBar range: 0 to 50 (representing 0.1s to 5.1s)
+        // Value = (progress * 100) + 100 ms
+        // 300ms -> progress = 2
+        int progress = (int) ((savedInterval - 100) / 100);
+        if (progress < 0) progress = 0;
+        if (progress > 50) progress = 50;
+        
+        seekUpdateInterval.setMax(50);
+        seekUpdateInterval.setProgress(progress);
+        updateIntervalLabel(savedInterval);
+        
+        // Apply to BluetoothManager immediately if connected
+        BluetoothManager.getInstance().setUpdateInterval(savedInterval);
 
-        if (tvSoundRaw != null) tvSoundRaw.setText(raw >= 0 ? String.valueOf(raw) : "--");
-        if (tvSoundPercent != null) tvSoundPercent.setText(percent >= 0 ? (percent + " %") : "-- %");
-        if (tvSoundThresholdLabel != null) tvSoundThresholdLabel.setText("Trigger volume: " + threshold + "%");
-        if (seekSoundThreshold != null) seekSoundThreshold.setProgress(threshold);
-        if (switchSoundMonitor != null) switchSoundMonitor.setChecked(enabled);
+        seekUpdateInterval.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                long interval = (progress * 100L) + 100L;
+                updateIntervalLabel(interval);
+                prefs.edit().putLong(KEY_UPDATE_INTERVAL, interval).apply();
+                BluetoothManager.getInstance().setUpdateInterval(interval);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
     }
-
-    private void setupSoundSensorControls() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-
-        if (seekSoundThreshold != null) {
-            seekSoundThreshold.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-                @Override
-                public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                    if (tvSoundThresholdLabel != null) tvSoundThresholdLabel.setText("Trigger volume: " + progress + "%");
-                    prefs.edit().putInt(KEY_SOUND_THRESHOLD, progress).apply();
-                }
-                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
-                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
-            });
-        }
-
-        if (switchSoundMonitor != null) {
-            switchSoundMonitor.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                prefs.edit().putBoolean(KEY_SOUND_ENABLED, isChecked).apply();
-                if (isChecked) {
-                    // Require active Bluetooth connection before polling
-                    boolean canPoll = MainActivity.sendBluetoothCommand('\u0000'); // no-op check for thread
-                    if (canPoll) {
-                        startSoundPolling();
-                        Toast.makeText(this, "Sound monitoring enabled", Toast.LENGTH_SHORT).show();
-                    } else {
-                        switchSoundMonitor.setChecked(false);
-                        prefs.edit().putBoolean(KEY_SOUND_ENABLED, false).apply();
-                        Toast.makeText(this, "Not connected to Arduino. Enable after Bluetooth connected.", Toast.LENGTH_LONG).show();
-                    }
-                } else {
-                    stopSoundPolling();
-                    Toast.makeText(this, "Sound monitoring disabled", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-    }
-
-    // Polling every 300ms when enabled
-    private final android.os.Handler soundHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable soundPollRunnable = new Runnable() {
-        @Override
-        public void run() {
-            MainActivity.sendBluetoothCommand('s');
-            soundHandler.postDelayed(this, 300);
-        }
-    };
-
-    private void startSoundPolling() {
-        stopSoundPolling();
-        soundHandler.postDelayed(soundPollRunnable, 300);
-    }
-
-    private void stopSoundPolling() {
-        soundHandler.removeCallbacks(soundPollRunnable);
-    }
-
-    public static void saveSoundValues(Context ctx, int raw, int percent) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        if (raw >= 0) {
-            editor.putInt(KEY_SOUND_RAW, raw);
-        }
-        editor.putInt(KEY_SOUND_PERCENT, percent);
-        editor.apply();
-    }
-
-    public static void notifySoundDataReceived(int raw, int percent) {
-        if (instance != null) {
-            instance.runOnUiThread(() -> {
-                if (instance.tvSoundRaw != null && raw >= 0) {
-                    instance.tvSoundRaw.setText(String.valueOf(raw));
-                }
-                if (instance.tvSoundPercent != null) {
-                    instance.tvSoundPercent.setText(percent + " %");
-                }
-            });
-        }
-    }
-
-    public static boolean isSoundMonitoringEnabled(Context ctx) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getBoolean(KEY_SOUND_ENABLED, false);
-    }
-
-    public static int getSoundThresholdPercent(Context ctx) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getInt(KEY_SOUND_THRESHOLD, 50);
-    }
-
-    // ---------- Light Sensor helpers ----------
-    private void loadLightValuesToUI() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        int percent = prefs.getInt(KEY_LIGHT_PERCENT, -1);
-
-        if (tvLightPercent != null) tvLightPercent.setText(percent >= 0 ? (percent + " %") : "-- %");
-    }
-
-    public static void saveLightValues(Context ctx, int raw, int percent) {
-        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        if (raw >= 0) {
-            editor.putInt(KEY_LIGHT_RAW, raw);
-        }
-        editor.putInt(KEY_LIGHT_PERCENT, percent);
-        editor.apply();
-    }
-
-    public static void notifyLightDataReceived(int raw, int percent) {
-        if (instance != null) {
-            instance.runOnUiThread(() -> {
-                if (instance.tvLightPercent != null) {
-                    instance.tvLightPercent.setText(percent + " %");
-                }
-            });
-        }
+    
+    private void updateIntervalLabel(long intervalMs) {
+        float seconds = intervalMs / 1000f;
+        tvUpdateIntervalLabel.setText(String.format("Interval: %.1fs", seconds));
     }
 
     // Static method to check if buzzer alarm is enabled
     public static boolean isBuzzerAlarmEnabled(Context ctx) {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         return prefs.getBoolean(KEY_BUZZER_ALARM, true); // Default ON
+    }
+    
+    // Static method to get update interval
+    public static long getUpdateInterval(Context ctx) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        return prefs.getLong(KEY_UPDATE_INTERVAL, 300);
     }
 
     private void setupThemeDropdown() {
@@ -600,5 +332,4 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
     }
-
 }
