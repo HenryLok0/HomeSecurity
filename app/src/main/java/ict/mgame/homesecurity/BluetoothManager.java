@@ -102,7 +102,9 @@ public class BluetoothManager {
                         Log.w(TAG, "Cannot get device name", e);
                     }
                     String finalName = name;
-                    new Handler(Looper.getMainLooper()).post(() -> listener.onConnected(finalName));
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (listener != null) listener.onConnected(finalName);
+                    });
                 }
 
                 connectedThread = new ConnectedThread(bluetoothSocket);
@@ -113,7 +115,9 @@ public class BluetoothManager {
                 isConnected = false;
                 isConnecting = false;
                 if (listener != null) {
-                    new Handler(Looper.getMainLooper()).post(() -> listener.onConnectionFailed());
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (listener != null) listener.onConnectionFailed();
+                    });
                 }
                 try {
                     if (bluetoothSocket != null) bluetoothSocket.close();
@@ -271,7 +275,9 @@ public class BluetoothManager {
                         System.arraycopy(data, start, jpeg, 0, jpeg.length);
                         final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
                         if (bmp != null && listener != null) {
-                            new Handler(Looper.getMainLooper()).post(() -> listener.onImageReceived(bmp));
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                if (listener != null) listener.onImageReceived(bmp);
+                            });
                         }
                     } catch (Exception e) {
                         Log.w(TAG, "Failed to decode JPEG chunk", e);
@@ -332,14 +338,18 @@ public class BluetoothManager {
                     int l = Integer.parseInt(line.substring(lightStart, lightEnd));
 
                     if (listener != null) {
-                        new Handler(Looper.getMainLooper()).post(() -> listener.onEnvDataReceived(t, h, s, l));
+                        new Handler(Looper.getMainLooper()).post(() -> {
+                            if (listener != null) listener.onEnvDataReceived(t, h, s, l);
+                        });
                     }
                 } catch (Exception e) {
                     Log.w(TAG, "Failed to parse ENV line: " + line, e);
                 }
             } else if (line.length() > 3 && !line.startsWith("TEMP=") && !line.startsWith("SOUND_RAW=")) {
                 if (listener != null) {
-                    new Handler(Looper.getMainLooper()).post(() -> listener.onMessageReceived(line));
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (listener != null) listener.onMessageReceived(line);
+                    });
                 }
             }
         }

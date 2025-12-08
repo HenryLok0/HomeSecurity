@@ -30,8 +30,17 @@ public class BackgroundDetectionService extends Service {
         
         // Acquire wake lock to keep CPU running in background
         PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HomeSecurity::BackgroundDetection");
-        wakeLock.acquire(10*60*1000L /*10 minutes*/);
+        if (powerManager != null) {
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HomeSecurity::BackgroundDetection");
+            // Remove timeout to prevent service from stopping after 10 minutes
+            try {
+                wakeLock.acquire();
+            } catch (Exception e) {
+                Log.e(TAG, "Error acquiring wake lock", e);
+            }
+        } else {
+            Log.e(TAG, "PowerManager is null, cannot acquire wake lock");
+        }
     }
 
     @Override
@@ -46,12 +55,21 @@ public class BackgroundDetectionService extends Service {
         
         // Start foreground service with notification
         Notification notification = createNotification();
-        if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting foreground service", e);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e instanceof android.app.ForegroundServiceStartNotAllowedException) {
+                 Log.e(TAG, "Foreground service start not allowed - app is in background");
+            }
+            stopSelf();
+            return START_NOT_STICKY;
         }
         
         isServiceRunning = true;
