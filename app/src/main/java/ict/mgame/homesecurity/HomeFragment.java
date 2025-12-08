@@ -263,6 +263,9 @@ public class HomeFragment extends Fragment implements BluetoothManager.Bluetooth
         tvHumidity.setText(String.format(Locale.getDefault(), "%.0f%%", hum));
         tvLight.setText(String.format(Locale.getDefault(), "%d%%", light));
         tvSound.setText(String.format(Locale.getDefault(), "%d%%", sound));
+
+        // Save data for charts
+        SensorDataManager.getInstance().addData(temp, hum, sound, light);
     }
 
     private void startBackgroundService() {

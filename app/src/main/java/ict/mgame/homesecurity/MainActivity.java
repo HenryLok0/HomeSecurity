@@ -96,6 +96,8 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new HistoryFragment();
             } else if (itemId == R.id.nav_alerts) {
                 selectedFragment = new AlertsFragment();
+            } else if (itemId == R.id.nav_data) {
+                selectedFragment = new HomeDataFragment();
             } else if (itemId == R.id.nav_settings) {
                 selectedFragment = new SettingsFragment();
             }
