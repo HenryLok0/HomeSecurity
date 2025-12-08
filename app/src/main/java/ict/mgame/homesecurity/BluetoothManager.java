@@ -236,21 +236,31 @@ public class BluetoothManager {
         private void processBuffer(ByteArrayOutputStream buffer) {
             byte[] data = buffer.toByteArray();
             if (data.length == 0) return;
+            
+            // Debug Log: Show how much data we have (helps to see if we are receiving anything)
+            if (data.length > 0) {
+                // Log.d(TAG, "Processing buffer: " + data.length + " bytes");
+            }
 
             // 1. Check for Raw Binary Frame (AA 04 21 ...)
             // Header: AA 04 21 W H ... (Start, Len, Cmd, W, H)
             int frameStart = -1;
-            for (int i = 0; i < data.length - 4; i++) {
-                if ((data[i] & 0xFF) == 0xAA && 
-                    (data[i+1] & 0xFF) == 0x04 && 
-                    (data[i+2] & 0xFF) == 0x21) {
-                    frameStart = i;
-                    break;
+            // We need at least 7 bytes for a header
+            if (data.length >= 7) {
+                for (int i = 0; i < data.length - 6; i++) {
+                    if ((data[i] & 0xFF) == 0xAA && 
+                        (data[i+1] & 0xFF) == 0x04 && 
+                        (data[i+2] & 0xFF) == 0x21) {
+                        frameStart = i;
+                        break;
+                    }
                 }
             }
 
             if (frameStart != -1) {
                 // Found header!
+                Log.d(TAG, "Found Frame Header at index: " + frameStart);
+                
                 // If there is data BEFORE the header, process it as text/garbage
                 if (frameStart > 0) {
                     byte[] textBytes = new byte[frameStart];
@@ -278,6 +288,7 @@ public class BluetoothManager {
                 int totalPacketSize = headerSize + imageSize;
 
                 if (data.length >= totalPacketSize) {
+                    Log.d(TAG, "Full frame received (" + totalPacketSize + " bytes). Decoding...");
                     // We have the full frame
                     try {
                         int[] pixels = new int[imageSize];
@@ -315,6 +326,7 @@ public class BluetoothManager {
                 } else {
                     // Incomplete frame, wait for more data
                     // Do NOT process as text
+                    // Log.d(TAG, "Incomplete frame: " + data.length + "/" + totalPacketSize);
                     return;
                 }
             }

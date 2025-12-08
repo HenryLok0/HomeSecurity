@@ -83,7 +83,7 @@ const uint16_t lineCount  = 120;
 const uint32_t baud       = 115200; // Reverted to 115200 as requested
 const ProcessFrameData processFrameData = processGrayscaleFrameBuffered;
 const uint16_t lineBufferLength = lineLength;
-const bool isSendWhileBuffering = true;
+const bool isSendWhileBuffering = false; // Changed to false to allow delay insertion
 const uint8_t uartPixelFormat   = UART_PIXEL_FORMAT_GRAYSCALE;
 CameraOV7670 camera(CameraOV7670::RESOLUTION_QQVGA_160x120,
                     CameraOV7670::PIXEL_YUV422, 17);
@@ -382,7 +382,12 @@ void processGrayscaleFrameBuffered() {
     processedByteCountDuringCameraRead = lineBufferSendByte - (&lineBuffer[0]);
 
     while (lineBufferSendByte < &lineBuffer[lineLength]) {
-      processNextGrayscalePixelByteInBuffer();
+      // processNextGrayscalePixelByteInBuffer(); // Replaced with manual sending + delay
+      if (isUartReady()) {
+        UDR0 = *lineBufferSendByte;
+        lineBufferSendByte++;
+        delayMicroseconds(150); // Critical delay for UNO1 SoftwareSerial stability
+      }
     }
   }
 }
@@ -555,9 +560,11 @@ uint8_t formatRgbPixelByteL(uint8_t pixelByteL) {
 void commandStartNewFrame(uint8_t pixelFormat) {
   waitForPreviousUartByteToBeSent();
   UDR0 = 0xAA; // New command START BYTE (Changed from 0x00 to 0xAA for better sync)
+  delayMicroseconds(200);
 
   waitForPreviousUartByteToBeSent();
   UDR0 = 4; // Command length
+  delayMicroseconds(200);
 
   uint8_t checksum = 0;
   checksum = sendNextCommandByte(checksum, COMMAND_NEW_FRAME);
@@ -577,9 +584,11 @@ void commandDebugPrint(const String debugText) {
   if (debugText.length() > 0) {
     waitForPreviousUartByteToBeSent();
     UDR0 = 0xAA; // New command START BYTE (Changed from 0x00 to 0xAA)
+    delayMicroseconds(200);
 
     waitForPreviousUartByteToBeSent();
     UDR0 = debugText.length() + 1; // +1 for command code.
+    delayMicroseconds(200);
     
     uint8_t checksum = 0;
     checksum = sendNextCommandByte(checksum, COMMAND_DEBUG_DATA);
@@ -596,6 +605,7 @@ void commandDebugPrint(const String debugText) {
 uint8_t sendNextCommandByte(uint8_t checksum, uint8_t commandByte) {
   waitForPreviousUartByteToBeSent();
   UDR0 = commandByte;
+  delayMicroseconds(200); // Added delay for stability
   return checksum ^ commandByte;
 }
 
