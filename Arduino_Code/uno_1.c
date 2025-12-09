@@ -1,17 +1,17 @@
-// UNO1: HomeSecurity + 蓝牙 + 串口桥接到 UNO2（摄像头板）
-// 传感器：DHT11(HW-507)、声音(HW-485)、光敏(HW-486)
-// 报警：有源蜂鸣器(HW-512)、双色LED(HW-477)
-// 按钮：HW-483 (- -> GND, 中间 -> 5V, S -> D4)
-// 按钮功能：切换系统总开关 (systemEnabled)
+// UNO1: HomeSecurity + Bluetooth + UART bridge to UNO2 (camera board)
+// Sensors: DHT11 (HW-507), Sound (HW-485), Photoresistor (HW-486)
+// Alarm: Active buzzer (HW-512), Bi-color LED (HW-477)
+// Button: HW-483 (- -> GND, middle -> 5V, S -> D4)
+// Button action: toggle system power (systemEnabled)
 
 #include <SoftwareSerial.h>
 #include <ctype.h>
 #include <DHT.h>
 
 // ----------------------
-// 蓝牙 HC-05 接法（UNO1）
+// Bluetooth HC-05 wiring (UNO1)
 // BT TXD -> D2 (UNO1 RX)
-// BT RXD -> D3 (UNO1 TX, via 分压)
+// BT RXD -> D3 (UNO1 TX, via voltage divider)
 // ----------------------
 const int BT_RX_PIN = 2;
 const int BT_TX_PIN = 3;
@@ -19,11 +19,11 @@ const int BT_TX_PIN = 3;
 SoftwareSerial BT(BT_RX_PIN, BT_TX_PIN);  // RX, TX
 
 // ----------------------
-// 报警设备（UNO1）
+// Alarm devices (UNO1)
 // ----------------------
 const int buzzerPin = 6;   // HW-512 +
-const int redPin   = 9;    // HW-477 R（串电阻）
-const int greenPin = 10;   // HW-477 G（串电阻）
+const int redPin   = 9;    // HW-477 R (series resistor)
+const int greenPin = 10;   // HW-477 G (series resistor)
 
 // ----------------------
 // DHT11 (HW-507)  VCC->5V, GND->GND, OUT->D7
@@ -38,40 +38,40 @@ float lastTemp = NAN;
 float lastHum  = NAN;
 
 // ----------------------
-// 声音传感器 HW-485 AO -> A0
+// Sound sensor HW-485 AO -> A0
 // ----------------------
 const int soundAnalogPin = A0;
 
 // ----------------------
-// 光敏电阻 HW-486 S -> A1
+// Photoresistor HW-486 S -> A1
 // ----------------------
 const int lightAnalogPin = A1;
 
 // ----------------------
-// 按钮 HW-483：- -> GND, 中间 -> 5V, S -> D4
+// Button HW-483: - -> GND, middle -> 5V, S -> D4
 // ----------------------
 const int buttonPin = 4;
 
-// 按钮去抖
+// Button debounce
 bool buttonState        = HIGH;
 bool lastButtonReading  = HIGH;
 unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50;
 
 // ----------------------
-// 系统状态
+// System state
 // ----------------------
-bool systemEnabled = false;   // false = 关机模式
-bool alarmOn       = false;   // 蓝牙 a/x 控制的报警标志
+bool systemEnabled = false;   // false = power-off mode
+bool alarmOn       = false;   // Bluetooth a/x controls the alarm flag
 
-// 报警闪烁控制
+// Alarm blink control
 unsigned long lastToggleTime = 0;
 const unsigned long alarmInterval = 300;
 bool alarmOutputState = false;
 
-// ========= 工具函数 =========
+// ========= Utility functions =========
 
-// 读声音（求平均）
+// Read sound level (average)
 int readSoundLevel() {
   const int SAMPLE_COUNT = 10;
   long sum = 0;
@@ -81,7 +81,7 @@ int readSoundLevel() {
   return sum / SAMPLE_COUNT;
 }
 
-// 读光线（求平均）
+// Read light level (average)
 int readLightLevel() {
   const int SAMPLE_COUNT = 10;
   long sum = 0;
@@ -91,7 +91,7 @@ int readLightLevel() {
   return sum / SAMPLE_COUNT;
 }
 
-// DHT11 读取（带缓存）
+// DHT11 read with caching
 bool readDHTIfNeeded() {
   unsigned long now = millis();
 
@@ -113,7 +113,7 @@ bool readDHTIfNeeded() {
   return true;
 }
 
-// 所有输出关（灯 + 蜂鸣器）
+// Turn off all outputs (LEDs + buzzer)
 void allOutputsOff() {
   digitalWrite(buzzerPin, LOW);
   digitalWrite(redPin, LOW);
@@ -121,23 +121,23 @@ void allOutputsOff() {
   alarmOutputState = false;
 }
 
-// 系统 OFF 时的输出：绿灯常亮
+// Outputs when system is OFF: green LED steady on
 void setSystemOffOutputs() {
   digitalWrite(buzzerPin, LOW);
   digitalWrite(redPin, LOW);
-  digitalWrite(greenPin, HIGH);   // 关机 = 绿灯常亮
+  digitalWrite(greenPin, HIGH);   // Power-off = green LED on
   alarmOutputState = false;
 }
 
-// 开机动画：红绿交替两轮，总共约 3 秒
-// 每个半阶段 750ms：R亮G灭 → R灭G亮，再重复一次
+// Startup animation: red/green alternate twice (~3 seconds total)
+// Each half-phase 750ms: R on/G off -> R off/G on, then repeat
 void playStartupAnimation() {
   const int halfPhase = 750; // ms
 
-  // 确保蜂鸣器不响
+  // Ensure buzzer stays silent
   digitalWrite(buzzerPin, LOW);
 
-  // 第一轮：R on / G off -> R off / G on
+  // First cycle: R on / G off -> R off / G on
   digitalWrite(redPin, HIGH);
   digitalWrite(greenPin, LOW);
   delay(halfPhase);
@@ -146,7 +146,7 @@ void playStartupAnimation() {
   digitalWrite(greenPin, HIGH);
   delay(halfPhase);
 
-  // 第二轮：再来一次
+  // Second cycle: repeat
   digitalWrite(redPin, HIGH);
   digitalWrite(greenPin, LOW);
   delay(halfPhase);
@@ -155,17 +155,17 @@ void playStartupAnimation() {
   digitalWrite(greenPin, HIGH);
   delay(halfPhase);
 
-  // 动画结束：全灭
+  // End animation: all off
   digitalWrite(redPin, LOW);
   digitalWrite(greenPin, LOW);
 }
 
-// ========= 蓝牙命令处理 =========
+// ========= Bluetooth command handling =========
 void handleBtCommand(char c) {
   char cmd = tolower(c);
 
   if (cmd == 'a') {
-    // 请求开启报警
+    // Request to enable alarm
     if (!systemEnabled) {
       BT.println(F("SYSTEM OFF, please press button to enable."));
       return;
@@ -174,12 +174,12 @@ void handleBtCommand(char c) {
     BT.println(F("ALARM ON"));
 
   } else if (cmd == 'x') {
-    // 关闭报警
+    // Turn off alarm
     alarmOn = false;
     BT.println(F("ALARM OFF"));
 
   } else if (cmd == 't') {
-    // 温湿度
+    // Temperature & humidity
     if (!readDHTIfNeeded()) {
       BT.println(F("ERROR: Failed to read from DHT11 sensor."));
       return;
@@ -191,7 +191,7 @@ void handleBtCommand(char c) {
     BT.println(F(" %"));
 
   } else if (cmd == 's') {
-    // 声音
+    // Sound
     int raw = readSoundLevel();
     int percent = map(raw, 0, 1023, 0, 100);
     BT.print(F("SOUND_RAW="));
@@ -201,7 +201,7 @@ void handleBtCommand(char c) {
     BT.println(F("%"));
 
   } else if (cmd == 'l') {
-    // 光线
+    // Light
     int raw = readLightLevel();
     int percent = map(raw, 0, 1023, 0, 100);
     BT.print(F("LIGHT_RAW="));
@@ -211,7 +211,7 @@ void handleBtCommand(char c) {
     BT.println(F("%"));
 
   } else if (cmd == 'e') {
-    // 环境快照
+    // Environment snapshot
     if (!readDHTIfNeeded()) {
       BT.println(F("ERROR: Failed to read from DHT11 sensor."));
       return;
@@ -245,22 +245,22 @@ void handleBtCommand(char c) {
     BT.println(F("SYSTEM OFF: green LED ON, 'a' ignored."));
 
   } else {
-    // 其它字符转发给 UNO2（摄像头板）
+    // Other characters are forwarded to UNO2 (camera board)
     Serial.write(c);
   }
 }
 
 // ========= setup & loop =========
 void setup() {
-  Serial.begin(115200);  // UNO2 串口（摄像头板），保持 115200
-  BT.begin(38400);       // HC-05 蓝牙，已经用 AT+UART=38400,0,0 设置过
+  Serial.begin(115200);  // UNO2 UART (camera board), keep 115200
+  BT.begin(38400);       // HC-05 Bluetooth, configured via AT+UART=38400,0,0
 
   pinMode(buzzerPin, OUTPUT);
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   pinMode(soundAnalogPin, INPUT);
   pinMode(lightAnalogPin, INPUT);
-  pinMode(buttonPin, INPUT);   // 使用模块自带电阻
+  pinMode(buttonPin, INPUT);   // Use onboard pull-ups on the module
 
   dht.begin();
 
@@ -272,7 +272,7 @@ void setup() {
   lastButtonReading = digitalRead(buttonPin);
   buttonState       = lastButtonReading;
 
-  // 初始：系统 OFF，绿灯常亮
+  // Initial state: system OFF, green LED steady on
   setSystemOffOutputs();
 
   BT.println(F("UNO1: HomeSecurity + Camera Bridge ready."));
@@ -282,20 +282,20 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // 1) UNO2 -> 蓝牙（摄像头数据 & 调试信息）
+  // 1) UNO2 -> Bluetooth (camera data & debug info)
   while (Serial.available()) {
     uint8_t b = Serial.read();
     BT.write(b);
   }
 
-  // 2) 蓝牙 -> 命令处理/转发
+  // 2) Bluetooth -> command handling/forwarding
   while (BT.available()) {
     char c = BT.read();
     if (c == '\r' || c == '\n') continue;
     handleBtCommand(c);
   }
 
-  // 3) 按钮去抖 + 切换 systemEnabled
+  // 3) Button debounce + toggle systemEnabled
   int reading = digitalRead(buttonPin);
   if (reading != lastButtonReading) {
     lastDebounceTime = now;
@@ -305,33 +305,33 @@ void loop() {
     if (reading != buttonState) {
       buttonState = reading;
 
-      // 假设按下时 S = LOW（KY-004 类常见模块是这样）
+      // Assume button pressed when S = LOW (common KY-004 style modules)
       if (buttonState == LOW) {
         systemEnabled = !systemEnabled;
 
         if (systemEnabled) {
           BT.println(F("SYSTEM ENABLED by button."));
-          // 从 OFF -> ON：先把关机绿灯灭掉，再播放动画
+          // OFF -> ON: turn off standby green LED, then play animation
           allOutputsOff();
-          playStartupAnimation();  // 红绿交替两轮 ≈ 3 秒
+          playStartupAnimation();  // Red/green alternate twice (~3s)
         } else {
           BT.println(F("SYSTEM OFF by button."));
           alarmOn = false;
-          setSystemOffOutputs();   // 关机：绿灯常亮
+          setSystemOffOutputs();   // Power-off: green LED steady on
         }
       }
     }
   }
   lastButtonReading = reading;
 
-  // 4) 根据 systemEnabled + alarmOn 控制输出
+  // 4) Control outputs based on systemEnabled + alarmOn
   if (!systemEnabled) {
-    // 系统关闭：始终保持绿灯常亮
+    // System off: always keep green LED on
     setSystemOffOutputs();
   } else {
-    // 系统开启
+    // System on
     if (alarmOn) {
-      // 报警：蜂鸣器 + 红绿灯闪烁
+      // Alarm: buzzer + red/green LEDs blink
       if (now - lastToggleTime >= alarmInterval) {
         lastToggleTime = now;
         alarmOutputState = !alarmOutputState;
@@ -341,7 +341,7 @@ void loop() {
         digitalWrite(greenPin,  alarmOutputState ? HIGH : LOW);
       }
     } else {
-      // 系统开但没有报警：灯和蜂鸣器都关
+      // System on but no alarm: LEDs and buzzer off
       allOutputsOff();
     }
   }
