@@ -175,6 +175,7 @@ public class BluetoothManager {
         private volatile boolean isRunning = true;
         private long lastEnvRequestTime = 0;
         private long envRequestInterval = 300; // Default 300ms
+        private float smoothedSound = 0; // For smoothing sound data
 
         public ConnectedThread(BluetoothSocket socket) {
             InputStream tmpIn = null;
@@ -433,13 +434,32 @@ public class BluetoothManager {
                     int soundEnd = line.indexOf("%", soundStart);
                     int s = Integer.parseInt(line.substring(soundStart, soundEnd));
 
+                    // Apply x5 multiplier
+                    s = s * 5;
+
+                    // Default minimum sound level 5 (start no any sound)
+                    if (s < 5) s = 5;
+
+                    if (s > 100) s = 100;
+
+                    // Apply smoothing (Low-pass filter)
+                    // alpha = 0.2 means 20% new value, 80% old value -> smooth transition
+                    smoothedSound = smoothedSound * 0.8f + s * 0.2f;
+                    s = (int) smoothedSound;
+
                     int lightStart = line.indexOf("LIGHT=") + 6;
                     int lightEnd = line.indexOf("%", lightStart);
                     int l = Integer.parseInt(line.substring(lightStart, lightEnd));
 
+                    // Invert light percentage (100 - data)
+                    l = 100 - l;
+                    if (l < 0) l = 0;
+
                     if (listener != null) {
+                        final int finalS = s;
+                        final int finalL = l;
                         new Handler(Looper.getMainLooper()).post(() -> {
-                            if (listener != null) listener.onEnvDataReceived(t, h, s, l);
+                            if (listener != null) listener.onEnvDataReceived(t, h, finalS, finalL);
                         });
                     }
                 } catch (Exception e) {
