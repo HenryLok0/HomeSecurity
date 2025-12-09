@@ -11,6 +11,7 @@ A comprehensive Android home security application with motion detection, remote 
 ### 📱 Mobile App Features
 - **Real-time Motion Detection** - AI-powered motion detection using CameraX.
 - **Home Data Dashboard** - **NEW!** Real-time line graphs for Temperature, Humidity, Sound, and Light levels.
+  - *Smart Data Processing*: Sound levels are amplified (x5) and smoothed for better visibility; Light levels are inverted for intuitive reading.
 - **Live Camera Monitoring** - View live camera feed on your Android device.
 - **Remote Camera Support** - Connect to Arduino-based camera modules (OV7670) via Bluetooth.
 - **Automatic Photo Capture** - Takes photos automatically when motion is detected.
@@ -22,7 +23,7 @@ A comprehensive Android home security application with motion detection, remote 
 - **Password Protection** - Secure login with password strength validation.
 
 ### 🔧 Arduino Integration
-- **Bluetooth Connectivity** - HC-05 Bluetooth module support.
+- **Bluetooth Connectivity** - HC-05 Bluetooth module support (**38400 baud**).
 - **Multi-Sensor Support**:
   - **DHT11**: Temperature & Humidity.
   - **Sound Sensor (HW-485)**: Noise level monitoring.
@@ -56,16 +57,33 @@ A comprehensive Android home security application with motion detection, remote 
   - SharedPreferences for local storage
 
 ### Arduino Hardware Stack
-- **Microcontroller**: Arduino UNO (x2 - Main + Camera)
-- **Bluetooth Module**: HC-05
-- **Camera Module**: OV7670 (connected to UNO2)
-- **Sensors**: 
-  - DHT11 Temperature & Humidity Sensor
-  - HW-485 Sound Sensor
-  - HW-486 Light Sensor (LDR)
-- **Actuators**:
-  - HW-512 Active Buzzer
-  - HW-477 Dual-Color LED Module
+The system uses two Arduino UNO boards working together:
+
+1.  **UNO1 (Bridge & Sensor Board)**:
+    - Handles Bluetooth communication with the Android App.
+    - Reads all environmental sensors (DHT11, Sound, Light).
+    - Controls the Alarm system (Buzzer, LEDs).
+    - Acts as a bridge, forwarding camera data from UNO2 to the App.
+2.  **UNO2 (Camera Board)**:
+    - Controls the OV7670 Camera module.
+    - Captures images and sends raw data to UNO1 via UART.
+
+## 🔌 Hardware Wiring Guide (UNO1)
+
+| Component | Pin on UNO1 | Notes |
+| :--- | :--- | :--- |
+| **Bluetooth (HC-05)** | | **Baud Rate: 38400** |
+| TXD | D2 | SoftwareSerial RX |
+| RXD | D3 | SoftwareSerial TX (Use voltage divider!) |
+| **Sensors** | | |
+| DHT11 (HW-507) | D7 | Temp & Humidity |
+| Sound (HW-485) | A0 | Analog Output |
+| Light (HW-486) | A1 | Analog Output |
+| Button (HW-483) | D4 | System Toggle |
+| **Alarm** | | |
+| Buzzer (HW-512) | D6 | Active Buzzer |
+| Red LED (HW-477) | D9 | Series resistor required |
+| Green LED (HW-477) | D10 | Series resistor required |
 
 ## 🚀 Getting Started
 
@@ -98,64 +116,9 @@ cd HomeSecurity
 4. Select your device and wait for installation
 
 #### 4. Setup Arduino
-1. Open `arduino_code.c` in Arduino IDE
-2. Install required libraries:
-   - DHT sensor library by Adafruit
-   - SoftwareSerial (included)
-3. Upload to your Arduino UNO
-4. Connect hardware components according to pin configuration
-
-### Arduino Pin Configuration
-
-**UNO1 (Main Board):**
-- **Bluetooth HC-05**: RX→D2, TX→D3
-- **Buzzer**: Signal→D6, GND→GND
-- **LED Red**: R→D9 (with resistor)
-- **LED Green**: G→D10 (with resistor)
-- **DHT11**: OUT→D7, VCC→5V, GND→GND
-- **Sound Sensor (HW-485)**: AO→A0
-- **Light Sensor (HW-486)**: AO→A1
-- **Button**: Signal→D4
-- **Serial to UNO2**: TX→RX, RX→TX (115200 baud)
-
-**UNO2 (Camera Board):**
-- **OV7670 Camera**: Standard connection (VSYNC, HREF, PCLK, D0-D7, SDA, SCL).
-- **Serial to UNO1**: TX→RX, RX→TX (115200 baud) for image transfer.
-
-## 📖 Usage
-
-### First Time Setup
-1. **Launch the app** - Login with your credentials.
-2. **Grant permissions** - Camera, Bluetooth, Notifications.
-3. **Connect Arduino** - Go to Settings → Connect Bluetooth Device.
-4. **Configure settings** - Set theme, enable/disable buzzer alarm.
-
-### Daily Operation
-1. **Start Motion Detection** - Tap the "Sensor ON" button on main screen.
-2. **Monitor Activity** - Watch for motion alerts in real-time.
-3. **Home Data** - Tap "Home Data" to view live graphs of sensor readings (0.5s interval).
-4. **Review History** - Check "History" to see all captured events.
-5. **Background Mode** - Enable background detection in Settings to monitor even when app is closed.
-
-### Commands (Arduino)
-- `a` - Activate alarm (buzzer + LED)
-- `x` - Deactivate alarm
-- `t` - Request temperature & humidity reading
-- `s` - Request sound level
-- `l` - Request light level
-- `e` - Request environment snapshot (Temp, Hum, Sound, Light)
-- `?` - Show help menu
-
-## ⚙️ Configuration
-
-### App Settings
-- **Bluetooth Device**: Select and connect to Arduino.
-- **Background Detection**: Enable/disable background monitoring.
-- **Buzzer Alarm**: Toggle physical alarm on motion detection.
-- **Sound Sensor**: Enable monitoring, view RAW/%, set trigger threshold.
-- **Light Sensor**: View RAW/% light levels.
-- **Theme Mode**: Choose between Light, Dark, or Follow Device.
-- **DHT11 Sensor**: View temperature and humidity readings.
+1. **UNO1 (Bridge)**: Open `Arduino_Code/uno_1.c` in Arduino IDE. Upload to the first board.
+2. **UNO2 (Camera)**: Open `OV7670/ExampleUart.cpp` (or the relevant sketch). Ensure `UART_MODE` is set to **2** (38400 baud). Upload to the second board.
+3. **Connect Boards**: Connect TX of UNO2 to RX of UNO1 (D2) if using software serial bridge, or follow specific bridge wiring instructions. *Note: Common ground is required.*
 
 ## 🌐 Bluetooth Protocol
 
@@ -173,7 +136,11 @@ cd HomeSecurity
 ### Arduino → App Responses
 All sensor data and status updates are sent via Bluetooth serial and displayed in the app. The app automatically polls for environment data (`e`) every 0.5s when connected to populate the Home Data graphs.
 
-## 📝 License
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -181,34 +148,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Henry Lok**
 - GitHub: [@HenryLok0](https://github.com/HenryLok0)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 🐛 Known Issues
-
-- Background service may be killed by aggressive battery optimization on some devices.
-- Bluetooth connection may drop if Arduino is too far from phone.
-
-## 📚 Documentation
-
-- [Arduino Integration Guide](DHT11_INTEGRATION_GUIDE.md)
-- [Background Detection Guide](BACKGROUND_DETECTION_GUIDE.md)
-
-## 🙏 Acknowledgments
-
-- [Material Design 3](https://m3.material.io/) for UI components
-- [CameraX](https://developer.android.com/training/camerax) for camera functionality
-- [Adafruit DHT Library](https://github.com/adafruit/DHT-sensor-library) for sensor support
-- Arduino community for hardware integration examples
-
----
-
-**⭐ Star this repository if you find it helpful!**
