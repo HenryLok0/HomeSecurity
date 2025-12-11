@@ -39,10 +39,6 @@ A comprehensive Android home security application with motion detection, remote 
 - Unified color scheme with brand consistency.
 - Responsive layouts for various screen sizes.
 
-## 📸 Screenshots
-
-*(Add your app screenshots here)*
-
 ## 🏗️ Architecture
 
 ### Android App Stack
